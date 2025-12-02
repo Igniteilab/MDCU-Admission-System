@@ -1,5 +1,5 @@
 
-import { Applicant, ApplicationStatus, DocumentStatus, ExamQuestion, ExamSuite, Gender, QuestionType, CustomFieldDefinition, PaymentConfig, FieldConfig, CustomFieldType, FeeStatus, DocumentConfig, DocumentItem, InterviewSlot, Announcement } from '../types';
+import { Applicant, ApplicationStatus, DocumentStatus, ExamQuestion, ExamSuite, Gender, QuestionType, CustomFieldDefinition, PaymentConfig, FieldConfig, CustomFieldType, FeeStatus, DocumentConfig, DocumentItem, InterviewSlot, Announcement, StaffUser, StaffRole } from '../types';
 
 const STORAGE_KEY_APPLICANTS = 'uniadmit_applicants';
 const STORAGE_KEY_EXAMS = 'uniadmit_exams';
@@ -10,6 +10,7 @@ const STORAGE_KEY_PAYMENT_CONFIG = 'uniadmit_payment_config';
 const STORAGE_KEY_EDUCATION_MAJORS = 'uniadmit_edu_majors';
 const STORAGE_KEY_INTERVIEW_SLOTS = 'uniadmit_interview_slots';
 const STORAGE_KEY_ANNOUNCEMENTS = 'uniadmit_announcements';
+const STORAGE_KEY_STAFF_USERS = 'uniadmit_staff_users';
 
 // --- Constants ---
 export const EDUCATION_LEVELS = [
@@ -119,6 +120,12 @@ const INITIAL_ANNOUNCEMENTS: Announcement[] = [
     }
 ];
 
+const INITIAL_STAFF_USERS: StaffUser[] = [
+    { id: 'admin_1', username: 'superadmin', fullName: 'Super Admin', role: StaffRole.SUPER_ADMIN },
+    { id: 'reviewer_1', username: 'reviewer1', fullName: 'Dr. Reviewer One', role: StaffRole.REVIEWER },
+    { id: 'proctor_1', username: 'proctor1', fullName: 'Exam Proctor A', role: StaffRole.PROCTOR, assignedGroupIds: [] }
+];
+
 // Base documents required for everyone
 export const MOCK_DOCS_TEMPLATE = {
   'doc_profile_pic': { id: 'doc_profile_pic', name: 'Profile Picture', status: DocumentStatus.PENDING, configId: 'doc_conf_pic' },
@@ -164,7 +171,8 @@ const INITIAL_APPLICANTS: Applicant[] = [
     fieldRejections: {},
     examGrading: {},
     isStarred: false,
-    rankingScore: 8
+    rankingScore: 8,
+    reviewerId: 'reviewer_1'
   },
   {
     id: 'user_2',
@@ -305,7 +313,8 @@ export const getApplicants = (): Applicant[] => {
           examGrading: app.examGrading || {},
           isStarred: app.isStarred || false,
           rankingScore: app.rankingScore || 0,
-          lastNotifiedStatus: app.lastNotifiedStatus || app.status
+          lastNotifiedStatus: app.lastNotifiedStatus || app.status,
+          reviewerId: app.reviewerId || null
       }));
   } catch (e) {
       return INITIAL_APPLICANTS;
@@ -581,6 +590,32 @@ export const saveAnnouncement = (ann: Announcement): void => {
 export const deleteAnnouncement = (id: string): void => {
     const anns = getAnnouncements().filter(a => a.id !== id);
     localStorage.setItem(STORAGE_KEY_ANNOUNCEMENTS, JSON.stringify(anns));
+};
+
+// --- Staff User Helpers ---
+export const getStaffUsers = (): StaffUser[] => {
+    const stored = localStorage.getItem(STORAGE_KEY_STAFF_USERS);
+    if (!stored) {
+        localStorage.setItem(STORAGE_KEY_STAFF_USERS, JSON.stringify(INITIAL_STAFF_USERS));
+        return INITIAL_STAFF_USERS;
+    }
+    return JSON.parse(stored);
+};
+
+export const saveStaffUser = (user: StaffUser): void => {
+    const users = getStaffUsers();
+    const idx = users.findIndex(u => u.id === user.id);
+    if (idx >= 0) {
+        users[idx] = user;
+    } else {
+        users.push(user);
+    }
+    localStorage.setItem(STORAGE_KEY_STAFF_USERS, JSON.stringify(users));
+};
+
+export const deleteStaffUser = (id: string): void => {
+    const users = getStaffUsers().filter(u => u.id !== id);
+    localStorage.setItem(STORAGE_KEY_STAFF_USERS, JSON.stringify(users));
 };
 
 export const createNewApplicant = (): Applicant => {

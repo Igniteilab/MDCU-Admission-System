@@ -169,6 +169,7 @@ export interface Applicant {
   isStarred?: boolean;
   rankingScore?: number; // 1-10 Score for internal ranking
   lastNotifiedStatus?: ApplicationStatus; // Status visible to user (syncs only when admin publishes)
+  reviewerId?: string; // ID of the StaffUser assigned to review this applicant
 }
 
 export enum QuestionType {
@@ -214,4 +215,19 @@ export interface Announcement {
   message: string;
   timestamp: string; // ISO Date
   type: 'info' | 'urgent' | 'success';
+}
+
+// --- Staff User Management ---
+export enum StaffRole {
+  SUPER_ADMIN = 'SUPER_ADMIN',
+  REVIEWER = 'REVIEWER', // Can only see assigned applicants
+  PROCTOR = 'PROCTOR'    // Can only see specific interview groups
+}
+
+export interface StaffUser {
+  id: string;
+  username: string;
+  fullName: string;
+  role: StaffRole;
+  assignedGroupIds?: string[]; // For Proctors: List of InterviewGroup IDs they can access
 }
