@@ -99,6 +99,9 @@ export const StaffDashboard: React.FC<Props> = ({ onLogout }) => {
   const [newFieldMaxScore, setNewFieldMaxScore] = useState<string>('');
   const [newFieldItemCount, setNewFieldItemCount] = useState<string>('');
   const [scoreConfigList, setScoreConfigList] = useState<{ exam: string, min: number, max: number }[]>([]);
+  const [newScoreExamName, setNewScoreExamName] = useState('');
+  const [newScoreExamMin, setNewScoreExamMin] = useState('');
+  const [newScoreExamMax, setNewScoreExamMax] = useState('');
 
   // Interview Slot State
   const [interviewSlots, setInterviewSlots] = useState<InterviewSlot[]>([]);
@@ -425,13 +428,25 @@ export const StaffDashboard: React.FC<Props> = ({ onLogout }) => {
       setIsFieldModalOpen(false);
   };
   const handleEditCustomField = (f: FieldConfig) => { setEditingFieldId(f.id); setNewFieldLabel(f.label); setNewFieldDesc(f.description||''); setNewFieldType(f.type as any); setNewFieldOptions(f.options?.join(', ')||''); setNewFieldMinScore(f.minScore?.toString()||''); setNewFieldMaxScore(f.maxScore?.toString()||''); setScoreConfigList(f.scoreConfig||[]); setNewFieldItemCount(f.itemCount?.toString()||''); setIsFieldModalOpen(true); };
-  const openAddFieldModal = () => { setEditingFieldId(null); setNewFieldLabel(''); setNewFieldDesc(''); setNewFieldType('text'); setNewFieldOptions(''); setIsFieldModalOpen(true); };
+  const openAddFieldModal = () => { setEditingFieldId(null); setNewFieldLabel(''); setNewFieldDesc(''); setNewFieldType('text'); setNewFieldOptions(''); setScoreConfigList([]); setIsFieldModalOpen(true); };
   const handleDeleteCustomField = (id: string) => { if(confirm("Delete?")) { deleteCustomField(id); setFieldConfigs(getFieldConfigs()); } };
   const toggleFieldVisibility = (id: string) => { const u = fieldConfigs.map(f=>f.id===id?{...f,isHidden:!f.isHidden}:f); saveFieldConfigs(u); setFieldConfigs(u); };
   const handleAddDocumentConfig = () => { const l = prompt("Name:"); if(l) { addDocumentConfig(l); setDocConfigs(getDocumentConfigs()); } };
   const handleDeleteDocumentConfig = (id: string) => { if(confirm("Delete?")) { deleteDocumentConfig(id); setDocConfigs(getDocumentConfigs()); } };
   const handleToggleDocVisibility = (id: string) => { const u = docConfigs.map(d=>d.id===id?{...d,isHidden:!d.isHidden}:d); saveDocumentConfigs(u); setDocConfigs(u); };
   const handleEditDocLabel = (id: string) => { const l = prompt("New Label:"); if(l) { const u = docConfigs.map(d=>d.id===id?{...d,label:l}:d); saveDocumentConfigs(u); setDocConfigs(u); } };
+
+  // Score Config Logic
+  const handleAddScoreConfig = () => {
+      if (!newScoreExamName || !newScoreExamMin || !newScoreExamMax) return;
+      setScoreConfigList([...scoreConfigList, { exam: newScoreExamName, min: parseFloat(newScoreExamMin), max: parseFloat(newScoreExamMax) }]);
+      setNewScoreExamName(''); setNewScoreExamMin(''); setNewScoreExamMax('');
+  };
+  const handleRemoveScoreConfig = (index: number) => {
+      const updated = [...scoreConfigList];
+      updated.splice(index, 1);
+      setScoreConfigList(updated);
+  };
 
   // Slot Handlers
   const handleSaveSlot = () => { if(!newSlotDate) return; 
@@ -594,6 +609,7 @@ export const StaffDashboard: React.FC<Props> = ({ onLogout }) => {
       {/* Main Content */}
       <div className="flex-1 md:ml-64 p-8 overflow-y-auto mb-16 md:mb-0">
         
+        {/* ... (Existing Views: Dashboard, Applicants, Appointments, Exams) ... */}
         {view === 'dashboard' && (
           <div className="space-y-6 max-w-7xl mx-auto">
             {/* ... Dashboard Content ... */}
@@ -614,7 +630,6 @@ export const StaffDashboard: React.FC<Props> = ({ onLogout }) => {
           </div>
         )}
 
-        {/* ... (Appointments & Exams logic kept same) ... */}
         {view === 'appointments' && (
             <div className="space-y-6 max-w-7xl mx-auto">
                 {selectedSlot ? (
@@ -713,6 +728,50 @@ export const StaffDashboard: React.FC<Props> = ({ onLogout }) => {
         )}
 
         {/* --- MODALS --- */}
+        {/* Field Modal */}
+        {isFieldModalOpen && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl max-h-[90vh] overflow-y-auto">
+                    <h3 className="text-xl font-bold mb-4">{editingFieldId ? 'Edit Field' : 'Add Custom Field'}</h3>
+                    <div className="space-y-3">
+                        {!isEditingStandardField && (
+                            <>
+                                <div><label className={labelStyle}>Label</label><input type="text" className={inputStyle} value={newFieldLabel} onChange={e=>setNewFieldLabel(e.target.value)} /></div>
+                                <div><label className={labelStyle}>Type</label><select className={inputStyle} value={newFieldType} onChange={e=>setNewFieldType(e.target.value as any)}><option value="text">Text</option><option value="dropdown">Dropdown</option><option value="checkbox">Checkbox</option><option value="radio">Radio</option><option value="score">Score</option></select></div>
+                                
+                                {(newFieldType==='dropdown' || newFieldType==='radio' || newFieldType==='checkbox') && (
+                                    <div><label className={labelStyle}>Options (comma separated)</label><input type="text" className={inputStyle} value={newFieldOptions} onChange={e=>setNewFieldOptions(e.target.value)} /></div>
+                                )}
+                                
+                                {newFieldType==='score' && (
+                                    <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                                        <label className="block text-sm font-bold text-gray-800 mb-2">Score Configuration</label>
+                                        <div className="space-y-2 mb-3">
+                                            {scoreConfigList.map((conf, idx) => (
+                                                <div key={idx} className="flex justify-between items-center bg-white p-2 border rounded text-xs">
+                                                    <span className="font-medium text-gray-700">{conf.exam} ({conf.min}-{conf.max})</span>
+                                                    <button onClick={() => handleRemoveScoreConfig(idx)} className="text-red-500 hover:text-red-700"><Trash2 className="w-3 h-3"/></button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 mb-2">
+                                            <div className="col-span-2"><input type="text" placeholder="Score Name / Exam Name (e.g. TOEIC, Thai)" className="w-full border rounded p-1.5 text-xs" value={newScoreExamName} onChange={e=>setNewScoreExamName(e.target.value)} /></div>
+                                            <div><input type="number" placeholder="Min Score" className="w-full border rounded p-1.5 text-xs" value={newScoreExamMin} onChange={e=>setNewScoreExamMin(e.target.value)} /></div>
+                                            <div><input type="number" placeholder="Max Score" className="w-full border rounded p-1.5 text-xs" value={newScoreExamMax} onChange={e=>setNewScoreExamMax(e.target.value)} /></div>
+                                        </div>
+                                        <Button size="sm" variant="secondary" onClick={handleAddScoreConfig} className="w-full text-xs">Add Score Name</Button>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                        <div><label className={labelStyle}>Description</label><textarea className={inputStyle} rows={3} value={newFieldDesc} onChange={e=>setNewFieldDesc(e.target.value)} /></div>
+                    </div>
+                    <div className="mt-6 flex justify-end space-x-2"><Button variant="secondary" onClick={closeFieldModal}>Cancel</Button><Button onClick={handleAddOrUpdateCustomField}>Save</Button></div>
+                </div>
+            </div>
+        )}
+
+        {/* ... Other Modals (Suite, Question, Slot, Announcement, Review) ... */}
         {/* Drill-down Modal */}
         {drilldownData && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -808,16 +867,32 @@ export const StaffDashboard: React.FC<Props> = ({ onLogout }) => {
                                 <div className="grid grid-cols-2 gap-4">
                                     {fieldConfigs.filter(f => !f.isHidden).map(field => {
                                         const val = field.type === 'standard' ? (selectedApplicant as any)[field.id] : selectedApplicant.customData?.[field.id];
+                                        let displayVal = val;
+                                        if (field.id === 'educations') {
+                                            displayVal = (selectedApplicant.educations || []).map(e => `${e.level}: ${e.degreeName} @ ${e.institution || '-'} (GPA: ${e.gpax})`).join('; ');
+                                        }
+                                        if (field.type === 'score' && val) {
+                                            displayVal = val.noScore ? 'No score' : `${val.exam}: ${val.score}`;
+                                        }
                                         const isRejected = draftApplicant?.fieldRejections?.[field.id];
-                                        const displayVal = (field.id==='educations') ? (val as any[]).map(e=>`${e.level} in ${e.degreeName}`).join(', ') : String(val||'-');
                                         
                                         return (
-                                            <div key={field.id} className={`p-3 border rounded relative group ${isRejected ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
-                                                <label className="text-xs font-bold text-gray-500 uppercase">{field.label}</label>
-                                                <div className="text-sm font-medium text-gray-900 mt-1 break-words">{displayVal}</div>
-                                                {!isReadOnlyView && (<div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => setActiveEditField(activeEditField === field.id ? null : field.id)} className="text-gray-400 hover:text-brand-600"><Pencil className="w-4 h-4"/></button></div>)}
-                                                {activeEditField === field.id && !isReadOnlyView && (<div className="mt-2 flex gap-2"><Button size="sm" variant="danger" className="h-6 text-xs" onClick={() => updateDraftFieldRejection(field.id)}>Revise</Button></div>)}
-                                                {isRejected && <p className="text-xs text-red-600 mt-1">Reason: {isRejected}</p>}
+                                            <div key={field.id} className="p-3 border rounded-lg bg-white relative group">
+                                                <div className="flex justify-between">
+                                                    <span className="text-xs font-bold text-gray-500 uppercase">{field.label}</span>
+                                                    {!isReadOnlyView && <div className="opacity-0 group-hover:opacity-100 flex gap-1"><button onClick={() => setActiveEditField(field.id)} className="text-gray-400 hover:text-brand-600"><Pencil className="w-3 h-3"/></button></div>}
+                                                </div>
+                                                <div className="text-sm font-medium text-gray-900 mt-1 break-words">{String(displayVal || '-')}</div>
+                                                
+                                                {/* Rejection UI */}
+                                                {activeEditField === field.id && !isReadOnlyView && (
+                                                    <div className="absolute top-0 right-0 bg-white shadow-lg border p-2 rounded z-10 flex flex-col gap-2 min-w-[150px]">
+                                                        <div className="text-xs font-bold">Reject Field?</div>
+                                                        <Button size="sm" className="h-6 text-xs bg-red-600" onClick={() => updateDraftFieldRejection(field.id)}>Reject / Revise</Button>
+                                                        <button onClick={() => setActiveEditField(null)} className="text-xs text-gray-500 hover:underline">Cancel</button>
+                                                    </div>
+                                                )}
+                                                {isRejected && <div className="mt-2 text-xs bg-red-50 text-red-600 p-1 rounded font-bold border border-red-100">Correction Requested</div>}
                                             </div>
                                         );
                                     })}
@@ -827,61 +902,33 @@ export const StaffDashboard: React.FC<Props> = ({ onLogout }) => {
 
                         {/* Docs Tab */}
                         {reviewTab === 'docs' && !isReadOnlyView && (
-                            <div className="space-y-4">
-                                {/* Admin Attach */}
-                                <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 flex flex-col items-center justify-center gap-2">
-                                    <h4 className="font-bold text-gray-700 text-sm">Admin Attachment</h4>
-                                    <div className="flex gap-2 w-full max-w-md">
-                                        <input type="text" placeholder="Document Name" className="border rounded px-2 py-1 text-sm flex-1" value={adminDocName} onChange={e=>setAdminDocName(e.target.value)} />
-                                        <input type="file" className="text-xs" onChange={e=>setAdminDocFile(e.target.files?.[0]||null)} />
-                                        <Button size="sm" onClick={handleAdminAttachDoc}>Upload</Button>
-                                    </div>
-                                </div>
-
-                                {/* User Docs */}
+                            <div className="space-y-6">
                                 {Object.values(draftApplicant?.documents || {}).map((doc: any) => (
-                                    <div key={doc.id} className="flex justify-between items-center p-3 border rounded hover:shadow-sm transition-shadow">
-                                        <div className="flex items-center gap-3"><FileText className="w-5 h-5 text-gray-400"/><div><div className="font-bold text-sm text-gray-900">{doc.name}</div><div className="text-xs text-gray-500">{doc.fileName} {doc.uploadedBy==='admin' && '(Admin)'}</div></div></div>
+                                    <div key={doc.id} className="flex justify-between items-center p-3 border rounded bg-white">
+                                        <div className="flex items-center gap-3"><FileText className="w-5 h-5 text-gray-400"/><div><div className="font-bold text-sm text-gray-900">{doc.name}</div><div className="text-xs text-gray-500">{doc.fileName}</div>{doc.reviewNote && <div className="text-xs text-red-500 font-bold">{doc.reviewNote}</div>}</div></div>
                                         <div className="flex items-center gap-2">
-                                            <span className={`px-2 py-0.5 text-xs rounded font-bold ${doc.status===DocumentStatus.APPROVED?'bg-green-100 text-green-700':doc.status===DocumentStatus.REJECTED?'bg-red-100 text-red-700':'bg-yellow-100 text-yellow-700'}`}>{doc.status}</span>
-                                            <div className="flex gap-1 ml-2">
-                                                <button onClick={() => window.open(doc.fileUrl, '_blank')} className="p-1.5 rounded hover:bg-gray-100 text-gray-500"><Eye className="w-4 h-4"/></button>
-                                                <button onClick={() => updateDraftDocStatus(doc.id, DocumentStatus.APPROVED)} className="p-1.5 rounded hover:bg-green-100 text-green-600"><Check className="w-4 h-4"/></button>
-                                                <button onClick={() => updateDraftDocStatus(doc.id, DocumentStatus.REJECTED)} className="p-1.5 rounded hover:bg-red-100 text-red-600"><X className="w-4 h-4"/></button>
-                                            </div>
+                                            {doc.status !== DocumentStatus.APPROVED && <button onClick={() => updateDraftDocStatus(doc.id, DocumentStatus.APPROVED)} className="bg-green-100 text-green-700 p-1.5 rounded hover:bg-green-200"><Check className="w-4 h-4"/></button>}
+                                            {doc.status !== DocumentStatus.REJECTED && <button onClick={() => updateDraftDocStatus(doc.id, DocumentStatus.REJECTED)} className="bg-red-100 text-red-700 p-1.5 rounded hover:bg-red-200"><X className="w-4 h-4"/></button>}
+                                            <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase border ${doc.status === DocumentStatus.APPROVED ? 'bg-green-50 border-green-200 text-green-700' : doc.status === DocumentStatus.REJECTED ? 'bg-red-50 border-red-200 text-red-700' : 'bg-gray-100 text-gray-600'}`}>{doc.status}</span>
                                         </div>
                                     </div>
                                 ))}
+                                <div className="pt-4 border-t"><h4 className="font-bold mb-2">Attach Admin Document</h4><div className="flex gap-2"><input type="text" placeholder="Document Name" className={inputStyle} value={adminDocName} onChange={e=>setAdminDocName(e.target.value)} /><input type="file" onChange={e=>setAdminDocFile(e.target.files?.[0]||null)} className="text-sm" /><Button size="sm" onClick={handleAdminAttachDoc}>Upload</Button></div></div>
                             </div>
                         )}
 
-                        {/* Exam Grading Tab */}
+                        {/* Exam Tab */}
                         {reviewTab === 'exam' && !isReadOnlyView && (
                             <div className="space-y-6">
-                                <div className="grid grid-cols-3 gap-4 mb-4"><div className="p-3 bg-blue-50 rounded border border-blue-100 text-center"><div className="text-xs text-blue-600 font-bold uppercase">Auto Score</div><div className="text-2xl font-bold text-blue-700">{selectedApplicant.examScore || 0}</div></div><div className="p-3 bg-purple-50 rounded border border-purple-100 text-center"><div className="text-xs text-purple-600 font-bold uppercase">Manual Score</div><div className="text-2xl font-bold text-purple-700">{Object.values(draftApplicant?.examGrading||{}).reduce((a: number, b: number)=>a+b, 0)}</div></div><div className="p-3 bg-green-50 rounded border border-green-100 text-center"><div className="text-xs text-green-600 font-bold uppercase">Total Score</div><div className="text-2xl font-bold text-green-700">{(selectedApplicant.examScore||0) + Object.values(draftApplicant?.examGrading || {} as Record<string, number>).reduce((a: number, b: number) => a + b, 0)}</div></div></div>
-                                {examSuites.map(suite => {
-                                    const qs = allQuestions.filter(q => q.suiteId === suite.id);
-                                    if(qs.length === 0) return null;
+                                <div className="grid grid-cols-2 gap-4 mb-4"><div className="bg-blue-50 p-4 rounded border border-blue-100 text-center"><div className="text-xs text-blue-500 font-bold uppercase">Online Score</div><div className="text-2xl font-bold text-blue-700">{selectedApplicant.examScore || 0}</div></div><div className="bg-purple-50 p-4 rounded border border-purple-100 text-center"><div className="text-xs text-purple-500 font-bold uppercase">Written Score</div><input type="number" className="text-center font-bold text-2xl bg-transparent w-full focus:outline-none text-purple-700" value={draftApplicant?.writtenScore || 0} onChange={(e) => setDraftApplicant({...draftApplicant!, writtenScore: Number(e.target.value)})} placeholder="0" /></div></div>
+                                <h4 className="font-bold text-gray-900 border-b pb-2">Entrance Test Grading</h4>
+                                {allQuestions.map((q, i) => {
+                                    const answer = draftApplicant?.examAnswers?.[q.id];
                                     return (
-                                        <div key={suite.id} className="border rounded-xl overflow-hidden">
-                                            <div className="bg-gray-100 px-4 py-2 font-bold text-sm text-gray-700">{suite.title}</div>
-                                            <div className="divide-y divide-gray-100">
-                                                {qs.map((q, idx) => {
-                                                    const ans = selectedApplicant.examAnswers?.[q.id];
-                                                    const isCorrect = q.type === QuestionType.MCQ_SINGLE ? q.options?.find(o => o.id === ans)?.isCorrect : false; // simplified logic
-                                                    return (
-                                                        <div key={q.id} className="p-4 bg-white">
-                                                            <div className="flex justify-between mb-2"><span className="font-bold text-sm text-gray-800">Q{idx+1}. {q.text}</span><span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-500">{q.score} pts</span></div>
-                                                            <div className="text-sm text-gray-600 mb-2">Answer: <span className="font-medium text-gray-900">{String(ans || '-')}</span></div>
-                                                            {q.type === QuestionType.ESSAY ? (
-                                                                <div className="flex items-center gap-2 mt-2"><span className="text-xs font-bold text-purple-600">Grade:</span><input type="number" className="w-16 border rounded p-1 text-sm" value={draftApplicant?.examGrading?.[q.id] || 0} onChange={(e) => updateDraftExamGrading(q.id, Number(e.target.value))} max={q.score}/> <span className="text-xs text-gray-400">/ {q.score}</span></div>
-                                                            ) : (
-                                                                <div className={`text-xs font-bold ${isCorrect ? 'text-green-600' : 'text-red-500'}`}>{isCorrect ? 'Correct (Auto-graded)' : 'Incorrect'}</div>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
+                                        <div key={q.id} className="p-3 border rounded bg-white">
+                                            <div className="flex justify-between"><span className="font-bold text-sm">Q{i+1}: {q.text}</span><span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600">{q.type}</span></div>
+                                            <div className="mt-2 text-sm text-gray-700 bg-gray-50 p-2 rounded">Answer: {Array.isArray(answer) ? answer.join(', ') : answer || '-'}</div>
+                                            {q.type === QuestionType.ESSAY && (<div className="mt-2 flex items-center gap-2"><span className="text-xs font-bold">Score (Max {q.score}):</span><input type="number" className="w-16 border rounded p-1 text-sm" value={draftApplicant?.examGrading?.[q.id] || 0} onChange={(e) => updateDraftExamGrading(q.id, Number(e.target.value))} /></div>)}
                                         </div>
                                     );
                                 })}
@@ -891,18 +938,10 @@ export const StaffDashboard: React.FC<Props> = ({ onLogout }) => {
                         {/* Fees Tab */}
                         {reviewTab === 'fees' && !isReadOnlyView && (
                             <div className="space-y-4">
-                                {['application', 'interview', 'tuition'].map(type => (
+                                {['application', 'interview', 'tuition'].map((type) => (
                                     <div key={type} className="flex justify-between items-center p-4 border rounded bg-white">
-                                        <div className="capitalize font-bold text-gray-700">{type} Fee</div>
-                                        <select 
-                                            className={`border rounded px-3 py-1 text-sm font-bold ${draftApplicant?.feeStatuses?.[type as keyof typeof draftApplicant.feeStatuses] === 'PAID' ? 'text-green-600 bg-green-50 border-green-200' : 'text-yellow-600 bg-yellow-50 border-yellow-200'}`}
-                                            value={draftApplicant?.feeStatuses?.[type as keyof typeof draftApplicant.feeStatuses]}
-                                            onChange={(e) => updateDraftFeeStatus(type, e.target.value as FeeStatus)}
-                                        >
-                                            <option value="PENDING">Pending</option>
-                                            <option value="PAID">Paid</option>
-                                            <option value="REJECTED">Rejected</option>
-                                        </select>
+                                        <div className="font-bold capitalize text-gray-900">{type} Fee</div>
+                                        <select value={draftApplicant?.feeStatuses?.[type as keyof typeof draftApplicant.feeStatuses]} onChange={(e) => updateDraftFeeStatus(type, e.target.value as FeeStatus)} className={`border rounded p-1 text-sm font-bold ${draftApplicant?.feeStatuses?.[type as keyof typeof draftApplicant.feeStatuses] === 'PAID' ? 'text-green-600 bg-green-50' : 'text-yellow-600 bg-yellow-50'}`}><option value="PENDING">Pending</option><option value="PAID">Paid</option><option value="REJECTED">Rejected</option></select>
                                     </div>
                                 ))}
                             </div>
@@ -911,155 +950,55 @@ export const StaffDashboard: React.FC<Props> = ({ onLogout }) => {
                         {/* Evaluation Tab */}
                         {reviewTab === 'evaluation' && !isReadOnlyView && (
                             <div className="space-y-4">
-                                <h4 className="font-bold text-gray-900 border-b pb-2">Scores</h4>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div><label className={labelStyle}>Written Score (Offline)</label><input type="number" className={inputStyle} value={draftApplicant?.writtenScore || ''} onChange={e=>setDraftApplicant({...draftApplicant!, writtenScore: Number(e.target.value)})} /></div>
-                                    <div><label className={labelStyle}>Interview Score</label><input type="number" className={inputStyle} value={draftApplicant?.interviewScore || ''} onChange={e=>setDraftApplicant({...draftApplicant!, interviewScore: Number(e.target.value)})} /></div>
-                                </div>
-                                <h4 className="font-bold text-gray-900 border-b pb-2 mt-4">Final Comment</h4>
-                                <textarea className={inputStyle} rows={3} placeholder="Interviewer comments..." value={draftApplicant?.evaluation?.comment || ''} onChange={e=>setDraftApplicant({...draftApplicant!, evaluation: { ...draftApplicant!.evaluation!, comment: e.target.value }})} />
+                                <h4 className="font-bold">Final Assessment</h4>
+                                <div><label className={labelStyle}>Interview Score (0-100)</label><input type="number" className={inputStyle} value={draftApplicant?.interviewScore || ''} onChange={(e) => setDraftApplicant({...draftApplicant!, interviewScore: Number(e.target.value)})} /></div>
+                                <div><label className={labelStyle}>Interviewer Comment</label><textarea className={inputStyle} rows={4} value={draftApplicant?.evaluation?.comment || ''} onChange={(e) => setDraftApplicant({...draftApplicant!, evaluation: { ...draftApplicant?.evaluation, comment: e.target.value } as any})} /></div>
                             </div>
                         )}
                     </div>
 
                     {/* Footer Actions */}
                     {!isReadOnlyView && (
-                        <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
-                            {/* Workflow Buttons */}
-                            {draftApplicant?.status === ApplicationStatus.SUBMITTED || draftApplicant?.status === ApplicationStatus.DOCS_REJECTED ? (
-                                <><Button variant="danger" onClick={() => handleDecision(ApplicationStatus.FAILED)}>Fail Applicant</Button><Button variant="secondary" onClick={() => handleDecision(ApplicationStatus.DOCS_APPROVED)}>Pass to Interview</Button></>
-                            ) : null}
-                            {[ApplicationStatus.DOCS_APPROVED, ApplicationStatus.INTERVIEW_READY, ApplicationStatus.INTERVIEW_BOOKED].includes(draftApplicant?.status || '' as any) ? (
-                                <><Button variant="danger" onClick={() => handleDecision(ApplicationStatus.FAILED)}>Fail Applicant</Button><Button variant="secondary" onClick={() => handleDecision(ApplicationStatus.PASSED)}>Pass Interview (Final)</Button></>
-                            ) : null}
-                            
-                            <Button onClick={saveAndNotifyApplicant} className="ml-4">Save & Notify Applicant</Button>
+                        <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-between items-center">
+                            <div className="text-xs text-gray-500">Changes are drafted. Click Save to apply.</div>
+                            <div className="flex gap-2">
+                                {/* Workflow Actions */}
+                                {[ApplicationStatus.SUBMITTED, ApplicationStatus.DOCS_REJECTED].includes(selectedApplicant.status) && (
+                                    <><Button size="sm" className="bg-red-600 hover:bg-red-700" onClick={() => handleDecision(ApplicationStatus.FAILED)}>Fail Applicant</Button><Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleDecision(ApplicationStatus.DOCS_APPROVED)}>Pass to Interview</Button></>
+                                )}
+                                {[ApplicationStatus.DOCS_APPROVED, ApplicationStatus.INTERVIEW_READY, ApplicationStatus.INTERVIEW_BOOKED].includes(selectedApplicant.status) && (
+                                    <><Button size="sm" className="bg-red-600 hover:bg-red-700" onClick={() => handleDecision(ApplicationStatus.FAILED)}>Fail Interview</Button><Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleDecision(ApplicationStatus.PASSED)}>Pass to Final</Button></>
+                                )}
+                                <Button onClick={saveAndNotifyApplicant}>Save & Notify Applicant</Button>
+                            </div>
                         </div>
                     )}
                 </div>
             </div>
         )}
 
-        {/* --- EXAM & FIELD MODALS --- */}
-        {/* Field Modal */}
-        {isFieldModalOpen && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl">
-                    <h3 className="text-xl font-bold mb-4">{editingFieldId ? 'Edit Field' : 'Add Custom Field'}</h3>
-                    <div className="space-y-3">
-                        {!isEditingStandardField && (
-                            <>
-                                <div><label className={labelStyle}>Label</label><input type="text" className={inputStyle} value={newFieldLabel} onChange={e=>setNewFieldLabel(e.target.value)} /></div>
-                                <div><label className={labelStyle}>Type</label><select className={inputStyle} value={newFieldType} onChange={e=>setNewFieldType(e.target.value as any)}><option value="text">Text</option><option value="dropdown">Dropdown</option><option value="checkbox">Checkbox</option><option value="radio">Radio</option><option value="score">Score</option></select></div>
-                                {(newFieldType==='dropdown' || newFieldType==='radio' || newFieldType==='checkbox') && (
-                                    <div><label className={labelStyle}>Options (comma separated)</label><input type="text" className={inputStyle} value={newFieldOptions} onChange={e=>setNewFieldOptions(e.target.value)} /></div>
-                                )}
-                                {newFieldType==='score' && (
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div><label className={labelStyle}>Min Score</label><input type="number" className={inputStyle} value={newFieldMinScore} onChange={e=>setNewFieldMinScore(e.target.value)} /></div>
-                                        <div><label className={labelStyle}>Max Score</label><input type="number" className={inputStyle} value={newFieldMaxScore} onChange={e=>setNewFieldMaxScore(e.target.value)} /></div>
-                                    </div>
-                                )}
-                            </>
-                        )}
-                        <div><label className={labelStyle}>Description</label><textarea className={inputStyle} rows={3} value={newFieldDesc} onChange={e=>setNewFieldDesc(e.target.value)} /></div>
-                    </div>
-                    <div className="mt-6 flex justify-end space-x-2"><Button variant="secondary" onClick={closeFieldModal}>Cancel</Button><Button onClick={handleAddOrUpdateCustomField}>Save</Button></div>
-                </div>
-            </div>
-        )}
-
-        {/* Suite Modal */}
+        {/* Exam Suite Modal */}
         {isSuiteModalOpen && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl animate-fade-in">
-                    <h3 className="text-xl font-bold mb-4">{editingSuiteId ? 'Edit Suite' : 'Create Exam Suite'}</h3>
-                    <div className="space-y-3">
-                        <div><label className={labelStyle}>Title</label><input type="text" className={inputStyle} value={suiteTitle} onChange={e=>setSuiteTitle(e.target.value)} /></div>
-                        <div><label className={labelStyle}>Description</label><textarea className={inputStyle} rows={3} value={suiteDesc} onChange={e=>setSuiteDesc(e.target.value)} /></div>
-                    </div>
-                    <div className="mt-6 flex justify-end space-x-2">
-                        <Button variant="secondary" onClick={() => setIsSuiteModalOpen(false)}>Cancel</Button>
-                        <Button onClick={handleSaveSuite}>Save</Button>
-                    </div>
-                </div>
-            </div>
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl"><h3 className="text-xl font-bold mb-4">{editingSuiteId ? 'Edit Suite' : 'Create Exam Suite'}</h3><div className="space-y-3"><div><label className={labelStyle}>Title</label><input type="text" className={inputStyle} value={suiteTitle} onChange={e=>setSuiteTitle(e.target.value)} /></div><div><label className={labelStyle}>Description</label><textarea className={inputStyle} rows={3} value={suiteDesc} onChange={e=>setSuiteDesc(e.target.value)} /></div></div><div className="mt-6 flex justify-end space-x-2"><Button variant="secondary" onClick={() => setIsSuiteModalOpen(false)}>Cancel</Button><Button onClick={handleSaveSuite}>Save</Button></div></div></div>
         )}
 
         {/* Question Modal */}
         {isQuestionModalOpen && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-lg p-6 w-full max-w-2xl shadow-xl flex flex-col max-h-[90vh] animate-fade-in">
-                    <h3 className="text-xl font-bold mb-4">{editingQuestionId ? 'Edit Question' : 'Add Question'}</h3>
-                    <div className="space-y-4 overflow-y-auto flex-1 p-1">
-                        <div><label className={labelStyle}>Question Text</label><textarea className={inputStyle} rows={2} value={qText} onChange={e=>setQText(e.target.value)} /></div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div><label className={labelStyle}>Type</label><select className={inputStyle} value={qType} onChange={e=>setQType(e.target.value as any)}><option value={QuestionType.MCQ_SINGLE}>Multiple Choice (Single)</option><option value={QuestionType.MCQ_MULTI}>Multiple Choice (Multi)</option><option value={QuestionType.ESSAY}>Essay</option></select></div>
-                            <div className="flex items-end pb-2"><label className="flex items-center space-x-2 cursor-pointer"><input type="checkbox" checked={qIsGraded} onChange={e=>setQIsGraded(e.target.checked)} className="rounded text-brand-600 focus:ring-brand-500" /><span className="text-sm font-medium text-gray-900">Graded Question</span></label></div>
-                        </div>
-                        {qIsGraded && (<div><label className={labelStyle}>Score</label><input type="number" className={inputStyle} value={qScore} onChange={e=>setQScore(e.target.value)} /></div>)}
-                        
-                        {qType !== QuestionType.ESSAY && (
-                            <div className="border-t pt-4 mt-2">
-                                <div className="flex justify-between items-center mb-2"><label className="block text-sm font-bold text-gray-700">Options</label></div>
-                                <div className="space-y-2">
-                                    {qOptions.map((opt, idx) => (
-                                        <div key={opt.id} className="flex items-center gap-2">
-                                            {qIsGraded && (
-                                                <input 
-                                                    type={qType === QuestionType.MCQ_SINGLE ? 'radio' : 'checkbox'} 
-                                                    name="correct_opt" 
-                                                    checked={opt.isCorrect} 
-                                                    onChange={() => handleToggleOption(opt.id)}
-                                                    className="text-green-600 focus:ring-green-500 cursor-pointer"
-                                                    title="Mark Correct"
-                                                />
-                                            )}
-                                            <input 
-                                                type="text" 
-                                                className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm" 
-                                                value={opt.text} 
-                                                onChange={e=>handleUpdateOption(opt.id, e.target.value)} 
-                                                placeholder={`Option ${idx+1}`}
-                                                disabled={opt.allowInput}
-                                            />
-                                            {opt.allowInput && <span className="text-xs text-gray-400 italic px-2">User Input</span>}
-                                            <button onClick={() => handleRemoveOption(opt.id)} className="text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4"/></button>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="mt-3 flex gap-2">
-                                    <Button size="sm" variant="secondary" onClick={handleAddOption} className="text-xs"><Plus className="w-3 h-3 mr-1"/> Add Option</Button>
-                                    <Button size="sm" variant="outline" onClick={handleAddOtherOption} className="text-xs"><Plus className="w-3 h-3 mr-1"/> Add 'Other'</Button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                    <div className="mt-6 flex justify-end space-x-2 border-t pt-4">
-                        <Button variant="secondary" onClick={() => setIsQuestionModalOpen(false)}>Cancel</Button>
-                        <Button onClick={handleSaveQuestion}>Save Question</Button>
-                    </div>
-                </div>
-            </div>
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-lg p-6 w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto"><h3 className="text-xl font-bold mb-4">{editingQuestionId ? 'Edit Question' : 'Add Question'}</h3><div className="space-y-3"><div><label className={labelStyle}>Question Text</label><textarea className={inputStyle} rows={2} value={qText} onChange={e=>setQText(e.target.value)} /></div><div className="flex gap-4"> <div className="w-1/2"><label className={labelStyle}>Type</label><select className={inputStyle} value={qType} onChange={e=>setQType(e.target.value as any)}><option value={QuestionType.MCQ_SINGLE}>Multiple Choice (Single)</option><option value={QuestionType.MCQ_MULTI}>Multiple Choice (Multi)</option><option value={QuestionType.ESSAY}>Essay</option></select></div><div className="w-1/2 pt-6"><label className="flex items-center"><input type="checkbox" checked={qIsGraded} onChange={e=>setQIsGraded(e.target.checked)} className="mr-2"/> Graded Question</label></div></div>{qIsGraded && (<div><label className={labelStyle}>Score</label><input type="number" className={inputStyle} value={qScore} onChange={e=>setQScore(e.target.value)} /></div>)}{qType !== QuestionType.ESSAY && (<div className="border p-3 rounded bg-gray-50"><div className="flex justify-between mb-2"><span className="text-sm font-bold">Options</span><div className="flex gap-2"><Button size="sm" variant="secondary" onClick={handleAddOtherOption} className="text-xs">+ 'Other'</Button><Button size="sm" onClick={handleAddOption} className="text-xs">+ Option</Button></div></div><div className="space-y-2">{qOptions.map((opt, idx) => (<div key={opt.id} className="flex gap-2 items-center"><input type={qType===QuestionType.MCQ_SINGLE?'radio':'checkbox'} name="correct-opt" checked={opt.isCorrect} onChange={() => handleToggleOption(opt.id)} disabled={!qIsGraded} title="Mark Correct"/><input type="text" className="flex-1 border rounded p-1.5 text-sm" value={opt.text} onChange={e=>handleUpdateOption(opt.id, e.target.value)} placeholder={opt.allowInput ? "User Input (Other)" : `Option ${idx+1}`} disabled={opt.allowInput} /><button onClick={() => handleRemoveOption(opt.id)} className="text-red-500"><Trash2 className="w-4 h-4"/></button></div>))}</div></div>)}</div><div className="mt-6 flex justify-end space-x-2"><Button variant="secondary" onClick={() => setIsQuestionModalOpen(false)}>Cancel</Button><Button onClick={handleSaveQuestion}>Save</Button></div></div></div>
         )}
 
         {/* Announcement Modal */}
         {isAnnouncementModalOpen && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl animate-fade-in">
-                    <h3 className="text-xl font-bold mb-4">Create Announcement</h3>
-                    <div className="space-y-3">
-                        <div><label className={labelStyle}>Title</label><input type="text" className={inputStyle} value={newAnnTitle} onChange={e=>setNewAnnTitle(e.target.value)} /></div>
-                        <div><label className={labelStyle}>Message</label><textarea className={inputStyle} rows={3} value={newAnnMessage} onChange={e=>setNewAnnMessage(e.target.value)} /></div>
-                        <div><label className={labelStyle}>Type</label><select className={inputStyle} value={newAnnType} onChange={e=>setNewAnnType(e.target.value as any)}><option value="info">Info (Blue)</option><option value="urgent">Urgent (Red)</option><option value="success">Success (Green)</option></select></div>
-                    </div>
-                    <div className="mt-6 flex justify-end space-x-2">
-                        <Button variant="secondary" onClick={() => setIsAnnouncementModalOpen(false)}>Cancel</Button>
-                        <Button onClick={handleSaveAnnouncement}>Post Notice</Button>
-                    </div>
-                </div>
-            </div>
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl"><h3 className="text-xl font-bold mb-4">Create Announcement</h3><div className="space-y-3"><div><label className={labelStyle}>Title</label><input type="text" className={inputStyle} value={newAnnTitle} onChange={e=>setNewAnnTitle(e.target.value)} /></div><div><label className={labelStyle}>Type</label><select className={inputStyle} value={newAnnType} onChange={e=>setNewAnnType(e.target.value as any)}><option value="info">Info (Blue)</option><option value="urgent">Urgent (Red)</option><option value="success">Success (Green)</option></select></div><div><label className={labelStyle}>Message</label><textarea className={inputStyle} rows={3} value={newAnnMessage} onChange={e=>setNewAnnMessage(e.target.value)} /></div></div><div className="mt-6 flex justify-end space-x-2"><Button variant="secondary" onClick={() => setIsAnnouncementModalOpen(false)}>Cancel</Button><Button onClick={handleSaveAnnouncement}>Post</Button></div></div></div>
         )}
+
+        {/* Footer Admin Controls */}
+        <div className="fixed bottom-0 right-0 p-4 flex gap-2 z-50">
+            {view === 'applicants' && (<Button size="sm" className="bg-gray-800 shadow-lg text-xs" onClick={demoGenerateApplicant}><UserPlus className="w-3 h-3 mr-1"/> New Applicant (Submitted)</Button>)}
+            {selectedApplicant && !isReadOnlyView && selectedApplicant.status === ApplicationStatus.SUBMITTED && (<Button size="sm" className="bg-green-700 shadow-lg text-xs" onClick={demoApproveCurrentDocs}><Check className="w-3 h-3 mr-1"/> Auto Approve Docs</Button>)}
+            {selectedApplicant && !isReadOnlyView && [ApplicationStatus.INTERVIEW_READY, ApplicationStatus.INTERVIEW_BOOKED].includes(selectedApplicant.status) && (<Button size="sm" className="bg-purple-700 shadow-lg text-xs" onClick={demoFillScores}><Calculator className="w-3 h-3 mr-1"/> Auto Fill Scores</Button>)}
+            {view === 'appointments' && selectedSlot && (<Button size="sm" className="bg-gray-800 shadow-lg text-xs" onClick={demoAddApplicantToSlot}><UserPlus className="w-3 h-3 mr-1"/> Add Applicant to Slot</Button>)}
+        </div>
 
       </div>
     </div>
