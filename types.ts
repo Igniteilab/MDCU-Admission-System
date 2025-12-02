@@ -206,3 +206,12 @@ export interface StaffStats {
   interviewReady: number;
   passed: number;
 }
+
+// --- Announcements ---
+export interface Announcement {
+  id: string;
+  title: string;
+  message: string;
+  timestamp: string; // ISO Date
+  type: 'info' | 'urgent' | 'success';
+}

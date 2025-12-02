@@ -1,5 +1,5 @@
 
-import { Applicant, ApplicationStatus, DocumentStatus, ExamQuestion, ExamSuite, Gender, QuestionType, CustomFieldDefinition, PaymentConfig, FieldConfig, CustomFieldType, FeeStatus, DocumentConfig, DocumentItem, InterviewSlot } from '../types';
+import { Applicant, ApplicationStatus, DocumentStatus, ExamQuestion, ExamSuite, Gender, QuestionType, CustomFieldDefinition, PaymentConfig, FieldConfig, CustomFieldType, FeeStatus, DocumentConfig, DocumentItem, InterviewSlot, Announcement } from '../types';
 
 const STORAGE_KEY_APPLICANTS = 'uniadmit_applicants';
 const STORAGE_KEY_EXAMS = 'uniadmit_exams';
@@ -9,6 +9,7 @@ const STORAGE_KEY_DOC_CONFIGS = 'uniadmit_doc_configs';
 const STORAGE_KEY_PAYMENT_CONFIG = 'uniadmit_payment_config';
 const STORAGE_KEY_EDUCATION_MAJORS = 'uniadmit_edu_majors';
 const STORAGE_KEY_INTERVIEW_SLOTS = 'uniadmit_interview_slots';
+const STORAGE_KEY_ANNOUNCEMENTS = 'uniadmit_announcements';
 
 // --- Constants ---
 export const EDUCATION_LEVELS = [
@@ -105,6 +106,16 @@ const INITIAL_INTERVIEW_SLOTS: InterviewSlot[] = [
         capacity: 20, 
         booked: 5,
         groups: [] 
+    }
+];
+
+const INITIAL_ANNOUNCEMENTS: Announcement[] = [
+    {
+        id: 'ann_1',
+        title: 'System Announcement',
+        message: 'The admission deadline is approaching (Dec 31st). Please ensure all documents are submitted.',
+        timestamp: new Date().toISOString(),
+        type: 'info'
     }
 ];
 
@@ -544,6 +555,32 @@ export const getPaymentConfig = (): PaymentConfig => {
 
 export const savePaymentConfig = (config: PaymentConfig): void => {
   localStorage.setItem(STORAGE_KEY_PAYMENT_CONFIG, JSON.stringify(config));
+};
+
+// --- Announcement Helpers ---
+export const getAnnouncements = (): Announcement[] => {
+    const stored = localStorage.getItem(STORAGE_KEY_ANNOUNCEMENTS);
+    if (!stored) {
+        localStorage.setItem(STORAGE_KEY_ANNOUNCEMENTS, JSON.stringify(INITIAL_ANNOUNCEMENTS));
+        return INITIAL_ANNOUNCEMENTS;
+    }
+    return JSON.parse(stored);
+};
+
+export const saveAnnouncement = (ann: Announcement): void => {
+    const anns = getAnnouncements();
+    const idx = anns.findIndex(a => a.id === ann.id);
+    if (idx >= 0) {
+        anns[idx] = ann;
+    } else {
+        anns.unshift(ann); // Add to top
+    }
+    localStorage.setItem(STORAGE_KEY_ANNOUNCEMENTS, JSON.stringify(anns));
+};
+
+export const deleteAnnouncement = (id: string): void => {
+    const anns = getAnnouncements().filter(a => a.id !== id);
+    localStorage.setItem(STORAGE_KEY_ANNOUNCEMENTS, JSON.stringify(anns));
 };
 
 export const createNewApplicant = (): Applicant => {

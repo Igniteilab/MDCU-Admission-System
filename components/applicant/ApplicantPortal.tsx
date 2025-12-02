@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Applicant, ApplicationStatus, DocumentStatus, QuestionType, DocumentItem, Gender, PaymentConfig, EducationRecord, FieldConfig, ExamSuite, InterviewSlot } from '../../types';
-import { getExams, saveApplicant, getExamSuites, MOCK_DOCS_TEMPLATE, getFieldConfigs, getPaymentConfig, EDUCATION_LEVELS, getInterviewSlots, bookInterviewSlot, getDocumentConfigs } from '../../services/storage';
+import { Applicant, ApplicationStatus, DocumentStatus, QuestionType, DocumentItem, Gender, PaymentConfig, EducationRecord, FieldConfig, ExamSuite, InterviewSlot, Announcement } from '../../types';
+import { getExams, saveApplicant, getExamSuites, MOCK_DOCS_TEMPLATE, getFieldConfigs, getPaymentConfig, EDUCATION_LEVELS, getInterviewSlots, bookInterviewSlot, getDocumentConfigs, getAnnouncements } from '../../services/storage';
 import { Button } from '../ui/Button';
 import { 
   CheckCircle, AlertCircle, Clock, Upload, FileText, Calendar, 
@@ -46,6 +46,9 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
   // Interview Slots (Dynamic)
   const [interviewSlots, setInterviewSlots] = useState<InterviewSlot[]>([]);
 
+  // Announcements
+  const [systemAnnouncements, setSystemAnnouncements] = useState<Announcement[]>([]);
+
   // Derived custom fields for render logic compatibility
   const customFields = fieldConfigs.filter(f => !f.isStandard);
 
@@ -88,6 +91,7 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
     setPaymentConfig(getPaymentConfig());
     setExamSuites(getExamSuites()); // Fetch dynamic suites
     setInterviewSlots(getInterviewSlots());
+    setSystemAnnouncements(getAnnouncements());
   }, [applicant]);
 
   // Ensure at least one payment method is selected if available
@@ -146,14 +150,16 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
   const getNotifications = () => {
       const notis = [];
       
-      // Static System Notice
-      notis.push({
-          id: 'sys_1',
-          title: 'System Announcement',
-          message: 'The admission deadline is approaching (Dec 31st). Please ensure all documents are submitted.',
-          time: '2 hours ago',
-          type: 'info',
-          read: false
+      // Dynamic System Notices from Admin
+      systemAnnouncements.forEach(ann => {
+          notis.push({
+              id: ann.id,
+              title: ann.title,
+              message: ann.message,
+              time: new Date(ann.timestamp).toLocaleDateString(),
+              type: ann.type,
+              read: false
+          });
       });
 
       // Status Based Notifications
