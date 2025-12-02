@@ -1,13 +1,12 @@
-
-import React, { useState, useEffect } from 'react';
-import { Applicant, ApplicationStatus, DocumentStatus, QuestionType, DocumentItem, Gender, PaymentConfig, EducationRecord, FieldConfig, ExamSuite, InterviewSlot, Announcement } from '../../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { Applicant, ApplicationStatus, DocumentStatus, QuestionType, DocumentItem, Gender, PaymentConfig, EducationRecord, FieldConfig, ExamSuite, InterviewSlot, Announcement, FeeStatus } from '../../types';
 import { getExams, saveApplicant, getExamSuites, MOCK_DOCS_TEMPLATE, getFieldConfigs, getPaymentConfig, EDUCATION_LEVELS, getInterviewSlots, bookInterviewSlot, getDocumentConfigs, getAnnouncements } from '../../services/storage';
 import { Button } from '../ui/Button';
 import { 
   CheckCircle, AlertCircle, Clock, Upload, FileText, Calendar, 
   Check, X, User, FileCheck, CreditCard, PenTool, Settings, RefreshCw, Wand2, Trash2, ChevronLeft, ArrowRight,
   Smartphone, QrCode, Image as ImageIcon, ToggleLeft, ToggleRight, GraduationCap, AlertTriangle, Mail, MapPin, Phone, Plus,
-  Globe, Bell, LogOut, HelpCircle, Award, MessageSquare, DollarSign
+  Globe, Bell, LogOut, HelpCircle, Award, MessageSquare, DollarSign, ZoomIn, ZoomOut, Move
 } from 'lucide-react';
 
 interface Props {
@@ -49,9 +48,6 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
   // Announcements
   const [systemAnnouncements, setSystemAnnouncements] = useState<Announcement[]>([]);
 
-  // Derived custom fields for render logic compatibility
-  const customFields = fieldConfigs.filter(f => !f.isStandard);
-
   // Education Logic State
   const [newEduLevel, setNewEduLevel] = useState<string>(EDUCATION_LEVELS[0].label);
 
@@ -70,6 +66,16 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
   const [signatureImage, setSignatureImage] = useState<string | null>(applicant.signatureImage || null);
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+
+  // --- Image Cropper State ---
+  const [isCropOpen, setIsCropOpen] = useState(false);
+  const [originalImage, setOriginalImage] = useState<string | null>(null);
+  const [cropScale, setCropScale] = useState(1);
+  const [cropPos, setCropPos] = useState({ x: 0, y: 0 });
+  const [isDraggingCrop, setIsDraggingCrop] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const cropImgRef = useRef<HTMLImageElement>(null);
+  // ---------------------------
 
   // Exam Logic State
   const [selectedSuiteId, setSelectedSuiteId] = useState<string | null>(null);
@@ -109,8 +115,7 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
     const requiredFields = fieldConfigs.filter(f => !f.isHidden && f.id !== 'customData');
     // Basic check for standard fields
     if (!formData.fullName || !formData.age || !formData.educations || formData.educations.length === 0 || !formData.phone || !formData.address) return false;
-    // Check score if required
-    // Check Letter of Recommendation
+    
     const lorField = fieldConfigs.find(f => f.id === 'recommendations');
     if (lorField && !lorField.isHidden) {
         const recs = (formData.customData?.recommendations as string[]) || [];
@@ -226,16 +231,14 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
 
     let currentEdus = [...(formData.educations || [])];
 
-    // Auto-add lower degrees logic (Cascading down to Bachelor's which is level 2)
-    // We want to add the selected level, and any missing levels below it down to Bachelor's.
+    // Auto-add lower degrees logic
     for (let l = selectedConfig.level; l >= 2; l--) {
         const config = EDUCATION_LEVELS.find(el => el.level === l);
         if (config) {
-            // Check if this level already exists in the list
             const exists = currentEdus.some(e => e.level === config.label);
             if (!exists) {
                 currentEdus.push({
-                    id: `edu_${Date.now()}_${l}`, // Ensure unique ID
+                    id: `edu_${Date.now()}_${l}`,
                     level: config.label,
                     degreeName: '',
                     institution: '',
@@ -275,26 +278,18 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
 
       const currentDocs: Record<string, DocumentItem> = { ...formData.documents };
       const educations = formData.educations || [];
-      const configs = docConfigs.length > 0 ? docConfigs : []; // Use loaded configs or empty to prevent reset if not loaded
+      const configs = docConfigs.length > 0 ? docConfigs : []; 
 
-      if (configs.length === 0) return; // Wait for configs to load
+      if (configs.length === 0) return; 
 
       // 1. Sync based on Configs
       configs.forEach(conf => {
-          // Skip if hidden
           if (conf.isHidden) return;
+          if (conf.id === 'doc_conf_edu') return;
 
-          // Special Handling: Education Certificate
-          if (conf.id === 'doc_conf_edu') {
-              // Handled below based on education records
-              return;
-          }
-
-          // Check if document already exists for this config
           const existingDoc = (Object.values(currentDocs) as DocumentItem[]).find(d => d.configId === conf.id);
           
           if (!existingDoc) {
-              // Create new doc entry
               const newId = `doc_${conf.id}_${Date.now()}`;
               currentDocs[newId] = {
                   id: newId,
@@ -303,13 +298,11 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
                   configId: conf.id
               };
           } else if (existingDoc.name !== conf.label) {
-              // Update label if changed in config
               currentDocs[existingDoc.id].name = conf.label;
           }
       });
 
       // 2. Handle Education Certificates (Dynamic)
-      // Remove stale certificates
       Object.keys(currentDocs).forEach(key => {
           if (currentDocs[key].isDynamic && currentDocs[key].configId === 'doc_conf_edu') {
               const eduId = key.replace('doc_cert_', '');
@@ -319,7 +312,6 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
           }
       });
 
-      // Add required certificates if configured visible
       const eduConfig = configs.find(c => c.id === 'doc_conf_edu');
       if (eduConfig && !eduConfig.isHidden) {
           educations.forEach(edu => {
@@ -366,6 +358,7 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
       setFormData({ ...formData, customData: updatedCustomData });
   };
 
+  // Generic file upload
   const handleFileUpload = (docId: string) => {
     const updatedDocs = { ...formData.documents };
     const mockFileName = `${updatedDocs[docId].name.replace(/[^a-zA-Z0-9]/g, '_')}_scanned.pdf`;
@@ -381,6 +374,135 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
     setFormData(updatedApplicant);
     saveApplicant(updatedApplicant);
     onUpdate(updatedApplicant);
+  };
+
+  // --- Profile Pic Cropping Handlers ---
+  const handleProfilePicSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files[0]) {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+              if (ev.target?.result) {
+                  setOriginalImage(ev.target.result as string);
+                  setCropScale(1);
+                  setCropPos({ x: 0, y: 0 });
+                  setIsCropOpen(true);
+                  // Reset input value so same file can be selected again if needed
+                  e.target.value = '';
+              }
+          };
+          reader.readAsDataURL(e.target.files[0]);
+      }
+  };
+
+  const handleCropMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
+      e.preventDefault();
+      setIsDraggingCrop(true);
+      const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+      setDragStart({ x: clientX - cropPos.x, y: clientY - cropPos.y });
+  };
+
+  const handleCropMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
+      if (!isDraggingCrop) return;
+      e.preventDefault();
+      const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+      setCropPos({
+          x: clientX - dragStart.x,
+          y: clientY - dragStart.y
+      });
+  };
+
+  const handleCropMouseUp = () => {
+      setIsDraggingCrop(false);
+  };
+
+  const handleCropSave = () => {
+      // 1. Create canvas
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = cropImgRef.current;
+      
+      // Crop dimensions (e.g., 300x300 for visible area)
+      const cropSize = 300;
+      canvas.width = cropSize;
+      canvas.height = cropSize;
+
+      if (ctx && img) {
+          // Draw the image transformed by current pan/zoom
+          // The image is visually centered in the 300x300 container
+          // transform: translate(cropPos.x, cropPos.y) scale(cropScale)
+          // We need to map this CSS transform to Canvas drawImage
+          
+          // Image natural dimensions
+          const naturalWidth = img.naturalWidth;
+          const naturalHeight = img.naturalHeight;
+          
+          // Current rendered dimensions (without zoom) inside the flex container?
+          // Simplification: We draw the image onto the canvas at the calculated offsets
+          
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, cropSize, cropSize);
+          
+          ctx.save();
+          // Move to center of canvas
+          ctx.translate(cropSize/2, cropSize/2);
+          // Apply scale
+          ctx.scale(cropScale, cropScale);
+          // Apply panning (offset from center)
+          ctx.translate(cropPos.x, cropPos.y);
+          
+          // Draw image centered at current origin
+          // We need to know the base display size. Assume 'contain' logic or similar.
+          // Let's assume the image is drawn based on its natural aspect ratio to fit/cover?
+          // To simplify: we render the image at its natural size? No, that's too big.
+          // We render it such that the larger dimension fits the box initially?
+          
+          // Let's align with the visual CSS logic:
+          // In CSS, we will display <img style={{ transform: ... }} /> inside a 300x300 overflow:hidden box.
+          // The image needs a base size. Let's say we set image width to 100% of container initially?
+          // Actually, typical croppers fit the image to the box.
+          
+          const aspectRatio = naturalWidth / naturalHeight;
+          let drawWidth, drawHeight;
+          
+          // Fit to cover or contain logic? Let's use 'contain' base size for visual consistency
+          if (aspectRatio > 1) {
+              drawWidth = cropSize;
+              drawHeight = cropSize / aspectRatio;
+          } else {
+              drawHeight = cropSize;
+              drawWidth = cropSize * aspectRatio;
+          }
+
+          // Draw centered
+          ctx.drawImage(img, -drawWidth/2, -drawHeight/2, drawWidth, drawHeight);
+          ctx.restore();
+          
+          // Export
+          const base64 = canvas.toDataURL('image/jpeg', 0.9);
+          
+          // Save to document
+          // Find Profile Pic Doc ID
+          const picDoc = (Object.values(formData.documents) as DocumentItem[]).find(d => d.configId === 'doc_conf_pic');
+          if (picDoc) {
+              const updatedDocs = { ...formData.documents };
+              updatedDocs[picDoc.id] = {
+                  ...updatedDocs[picDoc.id],
+                  status: DocumentStatus.UPLOADED,
+                  fileUrl: base64, // Store base64 directly for preview
+                  fileName: 'profile_pic_cropped.jpg',
+                  reviewNote: undefined 
+              };
+              const updated = { ...formData, documents: updatedDocs };
+              setFormData(updated);
+              saveApplicant(updated);
+              onUpdate(updated);
+          }
+          
+          setIsCropOpen(false);
+          setOriginalImage(null);
+      }
   };
 
   const handleFileDelete = (docId: string) => {
@@ -528,7 +650,12 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
           examScore: score,
           isESigned: true,
           signatureImage: signatureImage,
-          eSignTimestamp: new Date().toISOString()
+          eSignTimestamp: new Date().toISOString(),
+          feeStatuses: { 
+            application: 'PAID' as FeeStatus, 
+            interview: formData.feeStatuses?.interview || 'PENDING' as FeeStatus,
+            tuition: formData.feeStatuses?.tuition || 'PENDING' as FeeStatus
+          }
       };
       saveApplicant(updated);
       onUpdate(updated);
@@ -555,7 +682,12 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
       const updated = { 
           ...formData, 
           status: ApplicationStatus.INTERVIEW_READY,
-          lastNotifiedStatus: ApplicationStatus.INTERVIEW_READY // Instant update for payment
+          lastNotifiedStatus: ApplicationStatus.INTERVIEW_READY,
+          feeStatuses: { 
+             application: formData.feeStatuses?.application || 'PENDING' as FeeStatus,
+             interview: 'PAID' as FeeStatus,
+             tuition: formData.feeStatuses?.tuition || 'PENDING' as FeeStatus
+          }
       };
       saveApplicant(updated);
       onUpdate(updated);
@@ -574,7 +706,12 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
       const updated = { 
           ...formData, 
           status: ApplicationStatus.ENROLLED,
-          lastNotifiedStatus: ApplicationStatus.ENROLLED 
+          lastNotifiedStatus: ApplicationStatus.ENROLLED,
+          feeStatuses: { 
+             application: formData.feeStatuses?.application || 'PENDING' as FeeStatus,
+             interview: formData.feeStatuses?.interview || 'PENDING' as FeeStatus,
+             tuition: 'PAID' as FeeStatus
+          }
       };
       saveApplicant(updated);
       onUpdate(updated);
@@ -582,6 +719,17 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
       setSlipFile(null);
       setSlipPreview(null);
     }, 2000);
+  };
+
+  const handleDownloadReceipt = (feeType: string) => {
+      const text = `RECEIPT\n\nFee Type: ${feeType}\nDate: ${new Date().toLocaleString()}\nAmount: Paid\nApplicant: ${applicant.fullName}`;
+      const blob = new Blob([text], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Receipt_${feeType}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
   };
 
   const handleInterviewBook = (slotId: string) => {
@@ -810,12 +958,9 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
       // --- Score Field Renderer ---
       if (field.type === 'score') {
           const scoreData = (formData.customData?.[field.id] as {exam: string, score: string, noScore?: boolean} | undefined) || { exam: '', score: '', noScore: false };
-          
-          // Determine current exam config to get min/max
           const currentConfig = field.scoreConfig?.find(c => c.exam === scoreData.exam);
           const min = currentConfig?.min ?? field.minScore ?? 0;
           const max = currentConfig?.max ?? field.maxScore ?? 100;
-          
           const isError = !scoreData.noScore && scoreData.score && (parseFloat(scoreData.score) < min || parseFloat(scoreData.score) > max);
 
           return (
@@ -1496,7 +1641,7 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
                     >
                         <div className="w-9 h-9 rounded-full bg-brand-600 text-white flex items-center justify-center font-bold text-sm border-2 border-white shadow-sm hover:ring-2 hover:ring-brand-200 transition-all">
                             {applicant.documents['doc_profile_pic']?.status === 'uploaded' || applicant.documents['doc_profile_pic']?.status === 'approved' 
-                                ? <img src={"https://ui-avatars.com/api/?name=" + applicant.fullName.replace(" ", "+")} alt="Profile" className="w-full h-full rounded-full object-cover" />
+                                ? <img src={applicant.documents['doc_profile_pic']?.fileUrl || `https://ui-avatars.com/api/?name=${applicant.fullName.replace(" ", "+")}`} alt="Profile" className="w-full h-full rounded-full object-cover" />
                                 : applicant.fullName ? applicant.fullName.charAt(0).toUpperCase() : <User className="w-5 h-5"/>
                             }
                         </div>
@@ -1630,7 +1775,80 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
             </aside>
 
             {/* Right Content */}
-            <div className="flex-1 p-8 overflow-y-auto bg-gray-50 md:bg-white">
+            <div className="flex-1 p-8 overflow-y-auto bg-gray-50 md:bg-white relative">
+              {/* Image Crop Modal */}
+              {isCropOpen && originalImage && (
+                  <div className="absolute inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
+                      <div className="bg-white rounded-lg p-4 w-full max-w-md shadow-2xl animate-fade-in flex flex-col items-center">
+                          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center"><Upload className="w-5 h-5 mr-2"/> Adjust Photo</h3>
+                          
+                          {/* Crop Container */}
+                          <div 
+                              className="relative w-[300px] h-[300px] bg-gray-900 overflow-hidden cursor-move border-2 border-brand-500 rounded-md shadow-inner"
+                              onMouseDown={handleCropMouseDown}
+                              onMouseMove={handleCropMouseMove}
+                              onMouseUp={handleCropMouseUp}
+                              onMouseLeave={handleCropMouseUp}
+                              onTouchStart={handleCropMouseDown}
+                              onTouchMove={handleCropMouseMove}
+                              onTouchEnd={handleCropMouseUp}
+                          >
+                              <img 
+                                  ref={cropImgRef}
+                                  src={originalImage} 
+                                  alt="Crop Preview" 
+                                  className="absolute max-w-none origin-center pointer-events-none select-none"
+                                  style={{
+                                      transform: `translate(${cropPos.x}px, ${cropPos.y}px) scale(${cropScale})`,
+                                      left: '50%',
+                                      top: '50%',
+                                      // Centering correction for transform origin
+                                      marginLeft: '-50%', 
+                                      marginTop: '-50%'
+                                  }}
+                                  onLoad={(e) => {
+                                      // Initial Center
+                                      // Allow the image to load naturally
+                                  }}
+                              />
+                              {/* Grid Overlay */}
+                              <div className="absolute inset-0 pointer-events-none grid grid-cols-3 grid-rows-3 opacity-30">
+                                  {[...Array(9)].map((_, i) => <div key={i} className="border border-white/50"></div>)}
+                              </div>
+                          </div>
+
+                          {/* Controls */}
+                          <div className="w-full mt-6 px-4">
+                              <div className="flex justify-between items-center text-xs text-gray-500 mb-1">
+                                  <span>Zoom</span>
+                                  <span>{Math.round(cropScale * 100)}%</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                  <ZoomOut className="w-4 h-4 text-gray-400" />
+                                  <input 
+                                      type="range" 
+                                      min="0.5" 
+                                      max="3" 
+                                      step="0.1" 
+                                      value={cropScale}
+                                      onChange={(e) => setCropScale(parseFloat(e.target.value))}
+                                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                  />
+                                  <ZoomIn className="w-4 h-4 text-gray-400" />
+                              </div>
+                              <div className="text-center mt-2 text-xs text-gray-400 flex items-center justify-center gap-1">
+                                  <Move className="w-3 h-3"/> Drag to Reposition
+                              </div>
+                          </div>
+
+                          <div className="flex gap-3 w-full mt-6">
+                              <Button variant="secondary" className="flex-1" onClick={() => { setIsCropOpen(false); setOriginalImage(null); }}>Cancel</Button>
+                              <Button className="flex-1" onClick={handleCropSave}>Save Photo</Button>
+                          </div>
+                      </div>
+                  </div>
+              )}
+
               {/* 1. Personal Info */}
               {activeSubSection === 'profile' && (
                 <div>
@@ -1669,10 +1887,8 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
                     {(Object.values(formData.documents) as DocumentItem[]).filter(d => d.configId === 'doc_conf_pic' && (!docConfigs.find(c=>c.id==='doc_conf_pic')?.isHidden)).map(doc => (
                         <div key={doc.id} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row items-center gap-6 mb-6">
                             <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center border-2 border-gray-200 overflow-hidden relative group">
-                                {doc.fileName ? (
-                                    <div className="w-full h-full bg-brand-100 flex items-center justify-center text-brand-600 font-bold text-2xl">
-                                        {formData.fullName.charAt(0)}
-                                    </div>
+                                {doc.fileName && doc.fileUrl ? (
+                                    <img src={doc.fileUrl} alt="Profile" className="w-full h-full object-cover" />
                                 ) : (
                                     <User className="w-10 h-10 text-gray-400" />
                                 )}
@@ -1683,7 +1899,7 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
                                 <p className="text-sm text-gray-500 mb-2">Upload a recent photo of yourself.</p>
                                 <div className="flex justify-center md:justify-start gap-2">
                                     <label className="cursor-pointer">
-                                        <input type="file" className="hidden" onChange={() => handleFileUpload(doc.id)} disabled={!(!isEditRestricted || doc.status === DocumentStatus.REJECTED)} />
+                                        <input type="file" accept="image/*" className="hidden" onChange={handleProfilePicSelect} disabled={!(!isEditRestricted || doc.status === DocumentStatus.REJECTED)} />
                                         <span className={`inline-flex items-center px-4 py-2 border shadow-sm text-sm font-medium rounded-md transition-colors
                                             ${!(!isEditRestricted || doc.status === DocumentStatus.REJECTED) ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' : 'bg-brand-600 text-white hover:bg-brand-700 border-transparent'}`}>
                                             <Upload className="w-4 h-4 mr-2" /> {doc.fileName ? 'Change Photo' : 'Upload Photo'}
@@ -2362,7 +2578,7 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
                                         {fee.status || 'PENDING'}
                                     </span>
                                     {fee.status === 'PAID' && (
-                                        <Button size="sm" variant="outline" className="flex items-center" onClick={() => alert("Downloading Receipt...")}>
+                                        <Button size="sm" variant="outline" className="flex items-center" onClick={() => handleDownloadReceipt(fee.label)}>
                                             <FileText className="w-4 h-4 mr-2"/> Receipt
                                         </Button>
                                     )}
