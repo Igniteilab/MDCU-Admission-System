@@ -252,7 +252,7 @@ export const StaffDashboard: React.FC<Props> = ({ onLogout }) => {
       ];
   } else if (dashboardStatusFilter === 'FAILED') {
       chartTitle = "Rejection Analysis (Estimated)";
-      const failPending = applicants.filter(a => a.status === ApplicationStatus.FAILED && (!a.interviewSlot && Object.values(a.documents).some(d => d.status === DocumentStatus.REJECTED))).length;
+      const failPending = applicants.filter(a => a.status === ApplicationStatus.FAILED && (!a.interviewSlot && Object.values(a.documents).some((d: any) => d.status === DocumentStatus.REJECTED))).length;
       const failInterview = applicants.filter(a => a.status === ApplicationStatus.FAILED && a.interviewSlot).length;
       const failOther = applicants.filter(a => a.status === ApplicationStatus.FAILED).length - failPending - failInterview;
 
@@ -940,8 +940,8 @@ export const StaffDashboard: React.FC<Props> = ({ onLogout }) => {
             </div>
         )}
 
-        {/* Other Modals (Field Modal, Suite Modal, Question Modal, Announcement Modal) would be here */}
-        {/* Simplified due to space, assuming they exist from context or are hidden in this snippet but part of the full file */}
+        {/* --- EXAM & FIELD MODALS --- */}
+        {/* Field Modal */}
         {isFieldModalOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl">
@@ -968,6 +968,99 @@ export const StaffDashboard: React.FC<Props> = ({ onLogout }) => {
                 </div>
             </div>
         )}
+
+        {/* Suite Modal */}
+        {isSuiteModalOpen && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl animate-fade-in">
+                    <h3 className="text-xl font-bold mb-4">{editingSuiteId ? 'Edit Suite' : 'Create Exam Suite'}</h3>
+                    <div className="space-y-3">
+                        <div><label className={labelStyle}>Title</label><input type="text" className={inputStyle} value={suiteTitle} onChange={e=>setSuiteTitle(e.target.value)} /></div>
+                        <div><label className={labelStyle}>Description</label><textarea className={inputStyle} rows={3} value={suiteDesc} onChange={e=>setSuiteDesc(e.target.value)} /></div>
+                    </div>
+                    <div className="mt-6 flex justify-end space-x-2">
+                        <Button variant="secondary" onClick={() => setIsSuiteModalOpen(false)}>Cancel</Button>
+                        <Button onClick={handleSaveSuite}>Save</Button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* Question Modal */}
+        {isQuestionModalOpen && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-lg p-6 w-full max-w-2xl shadow-xl flex flex-col max-h-[90vh] animate-fade-in">
+                    <h3 className="text-xl font-bold mb-4">{editingQuestionId ? 'Edit Question' : 'Add Question'}</h3>
+                    <div className="space-y-4 overflow-y-auto flex-1 p-1">
+                        <div><label className={labelStyle}>Question Text</label><textarea className={inputStyle} rows={2} value={qText} onChange={e=>setQText(e.target.value)} /></div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div><label className={labelStyle}>Type</label><select className={inputStyle} value={qType} onChange={e=>setQType(e.target.value as any)}><option value={QuestionType.MCQ_SINGLE}>Multiple Choice (Single)</option><option value={QuestionType.MCQ_MULTI}>Multiple Choice (Multi)</option><option value={QuestionType.ESSAY}>Essay</option></select></div>
+                            <div className="flex items-end pb-2"><label className="flex items-center space-x-2 cursor-pointer"><input type="checkbox" checked={qIsGraded} onChange={e=>setQIsGraded(e.target.checked)} className="rounded text-brand-600 focus:ring-brand-500" /><span className="text-sm font-medium text-gray-900">Graded Question</span></label></div>
+                        </div>
+                        {qIsGraded && (<div><label className={labelStyle}>Score</label><input type="number" className={inputStyle} value={qScore} onChange={e=>setQScore(e.target.value)} /></div>)}
+                        
+                        {qType !== QuestionType.ESSAY && (
+                            <div className="border-t pt-4 mt-2">
+                                <div className="flex justify-between items-center mb-2"><label className="block text-sm font-bold text-gray-700">Options</label></div>
+                                <div className="space-y-2">
+                                    {qOptions.map((opt, idx) => (
+                                        <div key={opt.id} className="flex items-center gap-2">
+                                            {qIsGraded && (
+                                                <input 
+                                                    type={qType === QuestionType.MCQ_SINGLE ? 'radio' : 'checkbox'} 
+                                                    name="correct_opt" 
+                                                    checked={opt.isCorrect} 
+                                                    onChange={() => handleToggleOption(opt.id)}
+                                                    className="text-green-600 focus:ring-green-500 cursor-pointer"
+                                                    title="Mark Correct"
+                                                />
+                                            )}
+                                            <input 
+                                                type="text" 
+                                                className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm" 
+                                                value={opt.text} 
+                                                onChange={e=>handleUpdateOption(opt.id, e.target.value)} 
+                                                placeholder={`Option ${idx+1}`}
+                                                disabled={opt.allowInput}
+                                            />
+                                            {opt.allowInput && <span className="text-xs text-gray-400 italic px-2">User Input</span>}
+                                            <button onClick={() => handleRemoveOption(opt.id)} className="text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4"/></button>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="mt-3 flex gap-2">
+                                    <Button size="sm" variant="secondary" onClick={handleAddOption} className="text-xs"><Plus className="w-3 h-3 mr-1"/> Add Option</Button>
+                                    <Button size="sm" variant="outline" onClick={handleAddOtherOption} className="text-xs"><Plus className="w-3 h-3 mr-1"/> Add 'Other'</Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    <div className="mt-6 flex justify-end space-x-2 border-t pt-4">
+                        <Button variant="secondary" onClick={() => setIsQuestionModalOpen(false)}>Cancel</Button>
+                        <Button onClick={handleSaveQuestion}>Save Question</Button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* Announcement Modal */}
+        {isAnnouncementModalOpen && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl animate-fade-in">
+                    <h3 className="text-xl font-bold mb-4">Create Announcement</h3>
+                    <div className="space-y-3">
+                        <div><label className={labelStyle}>Title</label><input type="text" className={inputStyle} value={newAnnTitle} onChange={e=>setNewAnnTitle(e.target.value)} /></div>
+                        <div><label className={labelStyle}>Message</label><textarea className={inputStyle} rows={3} value={newAnnMessage} onChange={e=>setNewAnnMessage(e.target.value)} /></div>
+                        <div><label className={labelStyle}>Type</label><select className={inputStyle} value={newAnnType} onChange={e=>setNewAnnType(e.target.value as any)}><option value="info">Info (Blue)</option><option value="urgent">Urgent (Red)</option><option value="success">Success (Green)</option></select></div>
+                    </div>
+                    <div className="mt-6 flex justify-end space-x-2">
+                        <Button variant="secondary" onClick={() => setIsAnnouncementModalOpen(false)}>Cancel</Button>
+                        <Button onClick={handleSaveAnnouncement}>Post Notice</Button>
+                    </div>
+                </div>
+            </div>
+        )}
+
       </div>
     </div>
   );
