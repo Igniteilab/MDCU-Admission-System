@@ -20,10 +20,7 @@ const PALETTE = {
     info: '#3b82f6',    // Blue
     purple: '#8b5cf6',  // Violet
     neutral: '#6b7280', // Gray
-    // For Demographics
-    gender: { Male: '#3b82f6', Female: '#ec4899', Other: '#8b5cf6' },
-    // For Gradients/Variety
-    charts: ['#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#10b981']
+    gender: { Male: '#3b82f6', Female: '#ec4899', Other: '#8b5cf6' }
 };
 
 const DS = {
@@ -93,7 +90,6 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
   // Form Builder State
   const [fieldConfigs, setFieldConfigs] = useState<FieldConfig[]>([]);
   const [docConfigs, setDocConfigs] = useState<DocumentConfig[]>([]);
-  const [educationMajors, setEducationMajors] = useState<string[]>([]);
   
   // Modal State for Add/Edit Field
   const [isFieldModalOpen, setIsFieldModalOpen] = useState(false);
@@ -172,7 +168,7 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
   const dragItemDoc = useRef<number | null>(null);
   const dragOverItemDoc = useRef<number | null>(null);
 
-  // --- Initial Redirect based on Role ---
+  // --- Initial Data Load & Role Redirect ---
   useEffect(() => {
       if (currentUser.role === StaffRole.PROCTOR) {
           setView('appointments');
@@ -220,7 +216,6 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
     setExamSuites(getExamSuites());
     setAllQuestions(getExams());
     setDocConfigs(getDocumentConfigs());
-    setEducationMajors(getEducationMajors());
     setInterviewSlots(getInterviewSlots());
     setAnnouncements(getAnnouncements());
     setStaffUsers(getStaffUsers());
@@ -228,7 +223,7 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
 
   const getAvailableReviewers = () => staffUsers.filter(u => u.role === StaffRole.REVIEWER || u.role === StaffRole.SUPER_ADMIN);
 
-  // ... (Previous logic for Columns, Charts, etc. omitted for brevity, reusing existing) ...
+  // --- Table & Filter Helpers ---
   const columnsOptions = useMemo(() => {
       const cols: { id: string, label: string }[] = [];
       cols.push({ id: 'reviewerId', label: 'Reviewer' });
@@ -237,15 +232,11 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
       cols.push({ id: 'examScore', label: 'Online Score' });
       cols.push({ id: 'writtenScore', label: 'Written Score' });
       cols.push({ id: 'interviewScore', label: 'Interview Score' });
-      cols.push({ id: 'fee_application', label: 'Fee: Application' });
-      cols.push({ id: 'fee_interview', label: 'Fee: Interview' });
-      cols.push({ id: 'fee_tuition', label: 'Fee: Tuition' });
       return cols;
   }, [fieldConfigs, docConfigs]);
 
   const renderCellContent = (app: Applicant, colId: string) => {
       if (colId === 'reviewerId') { const r = staffUsers.find(u => u.id === app.reviewerId); return r ? <span className="text-xs bg-gray-100 px-2 py-1 rounded border">{r.fullName}</span> : <span className="text-xs text-gray-400">-</span>; }
-      if (colId.startsWith('fee_')) { const type = colId.replace('fee_', '') as keyof typeof app.feeStatuses; const status = app.feeStatuses?.[type] || 'PENDING'; return <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase border ${status==='PAID'?'bg-green-50 text-green-700 border-green-200':status==='REJECTED'?'bg-red-50 text-red-700 border-red-200':'bg-yellow-50 text-yellow-700 border-yellow-200'}`}>{status}</span>; }
       if (colId.startsWith('doc_')) { const confId = colId.replace('doc_', ''); const doc = Object.values(app.documents).find(d => d.configId === confId); const status = doc ? doc.status : 'missing'; let color = 'bg-gray-100 text-gray-500'; if (status === DocumentStatus.APPROVED) color = 'bg-green-100 text-green-700'; if (status === DocumentStatus.REJECTED) color = 'bg-red-100 text-red-700'; if (status === DocumentStatus.UPLOADED) color = 'bg-yellow-100 text-yellow-800'; return <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${color}`}>{status}</span>; }
       if (['examScore', 'writtenScore', 'interviewScore'].includes(colId)) { const val = (app as any)[colId]; return val !== undefined ? val : '-'; }
       if ((app as any)[colId] !== undefined) { const val = (app as any)[colId]; if (colId === 'educations') { return (val as any[] || []).map(e => e.level).join(', '); } return val; }
@@ -253,7 +244,7 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
       return '-';
   };
 
-  // ... (Dashboard Calculation logic reused) ...
+  // --- Dashboard Logic ---
   const getDashboardFilteredApplicants = (): Applicant[] => {
         if (dashboardStatusFilter === 'ALL') return applicants;
         return applicants.filter((app: Applicant) => {
@@ -266,42 +257,32 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
   };
   const dashboardApplicants: Applicant[] = getDashboardFilteredApplicants();
   const stats = { total: dashboardApplicants.length, pendingDocs: dashboardApplicants.filter(a => [ApplicationStatus.SUBMITTED, ApplicationStatus.DOCS_REJECTED].includes(a.status)).length, interviewReady: dashboardApplicants.filter(a => [ApplicationStatus.DOCS_APPROVED, ApplicationStatus.INTERVIEW_READY, ApplicationStatus.INTERVIEW_BOOKED].includes(a.status)).length, passed: dashboardApplicants.filter(a => [ApplicationStatus.PASSED, ApplicationStatus.ENROLLED].includes(a.status)).length };
-  let chartTitle = "Overall Status Distribution"; let chartData: { name: string, value: number, fill?: string }[] = [];
-  if (dashboardStatusFilter === 'ALL') { chartTitle = "Applicant Status Overview"; chartData = [ { name: 'Draft', value: applicants.filter(a => a.status === ApplicationStatus.DRAFT).length, fill: PALETTE.neutral }, { name: 'Pending', value: applicants.filter(a => [ApplicationStatus.SUBMITTED, ApplicationStatus.DOCS_REJECTED].includes(a.status)).length, fill: PALETTE.warning }, { name: 'Interview', value: applicants.filter(a => [ApplicationStatus.DOCS_APPROVED, ApplicationStatus.INTERVIEW_READY, ApplicationStatus.INTERVIEW_BOOKED].includes(a.status)).length, fill: PALETTE.purple }, { name: 'Final', value: applicants.filter(a => [ApplicationStatus.PASSED, ApplicationStatus.ENROLLED].includes(a.status)).length, fill: PALETTE.success }, { name: 'Failed', value: applicants.filter(a => a.status === ApplicationStatus.FAILED).length, fill: PALETTE.danger } ]; } 
-  else if (dashboardStatusFilter === 'PENDING') { chartTitle = "Pending Review Breakdown"; chartData = [ { name: 'Submitted', value: applicants.filter(a => a.status === ApplicationStatus.SUBMITTED).length, fill: PALETTE.warning }, { name: 'Docs Rejected', value: applicants.filter(a => a.status === ApplicationStatus.DOCS_REJECTED).length, fill: PALETTE.danger } ]; }
-  else if (dashboardStatusFilter === 'INTERVIEW') { chartTitle = "Interview Stage Breakdown"; chartData = [ { name: 'Docs Approved', value: applicants.filter(a => a.status === ApplicationStatus.DOCS_APPROVED).length, fill: PALETTE.info }, { name: 'Payment Ready', value: applicants.filter(a => a.status === ApplicationStatus.INTERVIEW_READY).length, fill: PALETTE.purple }, { name: 'Booked', value: applicants.filter(a => a.status === ApplicationStatus.INTERVIEW_BOOKED).length, fill: '#7e22ce' } ]; }
-  else if (dashboardStatusFilter === 'FINAL') { chartTitle = "Final Selection Breakdown"; chartData = [ { name: 'Passed', value: applicants.filter(a => a.status === ApplicationStatus.PASSED).length, fill: PALETTE.success }, { name: 'Enrolled', value: applicants.filter(a => a.status === ApplicationStatus.ENROLLED).length, fill: '#15803d' } ]; }
-  else if (dashboardStatusFilter === 'FAILED') { chartTitle = "Rejection Analysis (Estimated)"; const failPending = applicants.filter(a => a.status === ApplicationStatus.FAILED && (!a.interviewSlot && Object.values(a.documents).some((d: any) => d.status === DocumentStatus.REJECTED))).length; const failInterview = applicants.filter(a => a.status === ApplicationStatus.FAILED && a.interviewSlot).length; const failOther = applicants.filter(a => a.status === ApplicationStatus.FAILED).length - failPending - failInterview; chartData = [ { name: 'Doc Review', value: failPending, fill: '#f87171' }, { name: 'Interview', value: failInterview, fill: PALETTE.danger }, { name: 'Other', value: failOther, fill: '#b91c1c' } ]; }
+  
+  let chartTitle = "Status"; let chartData: { name: string, value: number, fill?: string }[] = [];
+  if (dashboardStatusFilter === 'ALL') { chartTitle = "Status Overview"; chartData = [ { name: 'Draft', value: applicants.filter(a => a.status === ApplicationStatus.DRAFT).length, fill: PALETTE.neutral }, { name: 'Pending', value: applicants.filter(a => [ApplicationStatus.SUBMITTED, ApplicationStatus.DOCS_REJECTED].includes(a.status)).length, fill: PALETTE.warning }, { name: 'Interview', value: applicants.filter(a => [ApplicationStatus.DOCS_APPROVED, ApplicationStatus.INTERVIEW_READY, ApplicationStatus.INTERVIEW_BOOKED].includes(a.status)).length, fill: PALETTE.purple }, { name: 'Final', value: applicants.filter(a => [ApplicationStatus.PASSED, ApplicationStatus.ENROLLED].includes(a.status)).length, fill: PALETTE.success }, { name: 'Failed', value: applicants.filter(a => a.status === ApplicationStatus.FAILED).length, fill: PALETTE.danger } ]; } 
+  else if (dashboardStatusFilter === 'PENDING') { chartTitle = "Pending Breakdown"; chartData = [ { name: 'Submitted', value: applicants.filter(a => a.status === ApplicationStatus.SUBMITTED).length, fill: PALETTE.warning }, { name: 'Docs Rejected', value: applicants.filter(a => a.status === ApplicationStatus.DOCS_REJECTED).length, fill: PALETTE.danger } ]; }
+  else if (dashboardStatusFilter === 'INTERVIEW') { chartTitle = "Interview Breakdown"; chartData = [ { name: 'Approved', value: applicants.filter(a => a.status === ApplicationStatus.DOCS_APPROVED).length, fill: PALETTE.info }, { name: 'Ready', value: applicants.filter(a => a.status === ApplicationStatus.INTERVIEW_READY).length, fill: PALETTE.purple }, { name: 'Booked', value: applicants.filter(a => a.status === ApplicationStatus.INTERVIEW_BOOKED).length, fill: '#7e22ce' } ]; }
+  else if (dashboardStatusFilter === 'FINAL') { chartTitle = "Final Breakdown"; chartData = [ { name: 'Passed', value: applicants.filter(a => a.status === ApplicationStatus.PASSED).length, fill: PALETTE.success }, { name: 'Enrolled', value: applicants.filter(a => a.status === ApplicationStatus.ENROLLED).length, fill: '#15803d' } ]; }
+  else if (dashboardStatusFilter === 'FAILED') { chartTitle = "Failure Analysis"; chartData = [ { name: 'Failed', value: applicants.filter(a => a.status === ApplicationStatus.FAILED).length, fill: PALETTE.danger } ]; }
+  
   const rankingDataRaw = dashboardApplicants.reduce((acc, app: Applicant) => { const score = app.rankingScore || 0; const label = score === 0 ? 'Unranked' : `Rank ${score}`; acc[label] = (acc[label] || 0) + 1; return acc; }, {} as Record<string, number>);
   const rankingChartData = Object.keys(rankingDataRaw).sort((a, b) => { if (a === 'Unranked') return -1; if (b === 'Unranked') return 1; return parseInt(a.replace('Rank ', '')) - parseInt(b.replace('Rank ', '')); }).map(key => ({ name: key, value: rankingDataRaw[key] }));
   const genderData = [ { name: 'Male', value: dashboardApplicants.filter(a => a.gender === 'Male').length }, { name: 'Female', value: dashboardApplicants.filter(a => a.gender === 'Female').length }, ];
   const ageGroups = { '< 18': 0, '18-21': 0, '22-25': 0, '26+': 0 }; dashboardApplicants.forEach(app => { if (app.age < 18) ageGroups['< 18']++; else if (app.age <= 21) ageGroups['18-21']++; else if (app.age <= 25) ageGroups['22-25']++; else ageGroups['26+']++; }); const ageChartData = Object.keys(ageGroups).map(key => ({ name: key, value: ageGroups[key as keyof typeof ageGroups] }));
   const educationDataRaw = dashboardApplicants.reduce((acc, app: Applicant) => { let highestLevel = 'Unknown'; let highestLevelVal = 0; if (app.educations && app.educations.length > 0) { app.educations.forEach(edu => { const levelObj = EDUCATION_LEVELS.find(l => l.label === edu.level); const val = levelObj ? levelObj.level : 0; if (val > highestLevelVal) { highestLevelVal = val; highestLevel = edu.level; } }); } else { highestLevel = 'None'; } acc[highestLevel] = (acc[highestLevel] || 0) + 1; return acc; }, {} as Record<string, number>); const educationChartData = Object.keys(educationDataRaw).map(key => ({ name: key, value: educationDataRaw[key] }));
 
-  // --- Handlers (Reused) ---
-  const handleChartClick = (type: 'gender' | 'age' | 'education' | 'status' | 'ranking', value: string) => { if (!value) return; let filtered: Applicant[] = []; if (type === 'status') { filtered = dashboardApplicants.filter((app: Applicant) => { if (value === 'Draft') return app.status === ApplicationStatus.DRAFT; if (value === 'Submitted') return app.status === ApplicationStatus.SUBMITTED; if (value === 'Docs Rejected') return app.status === ApplicationStatus.DOCS_REJECTED; if (value === 'Docs Approved') return app.status === ApplicationStatus.DOCS_APPROVED; if (value === 'Payment Ready') return app.status === ApplicationStatus.INTERVIEW_READY; if (value === 'Booked') return app.status === ApplicationStatus.INTERVIEW_BOOKED; if (value === 'Passed') return app.status === ApplicationStatus.PASSED; if (value === 'Enrolled') return app.status === ApplicationStatus.ENROLLED; if (value === 'Pending') return [ApplicationStatus.SUBMITTED, ApplicationStatus.DOCS_REJECTED].includes(app.status); if (value === 'Interview') return [ApplicationStatus.DOCS_APPROVED, ApplicationStatus.INTERVIEW_READY, ApplicationStatus.INTERVIEW_BOOKED].includes(app.status); if (value === 'Final') return [ApplicationStatus.PASSED, ApplicationStatus.ENROLLED].includes(app.status); if (value === 'Failed' || value === 'Other' || value === 'Doc Review') return app.status === ApplicationStatus.FAILED; return false; }); } else if (type === 'ranking') { filtered = dashboardApplicants.filter((app: Applicant) => { const score = app.rankingScore || 0; const label = score === 0 ? 'Unranked' : `Rank ${score}`; return label === value; }); } else if (type === 'gender') { filtered = dashboardApplicants.filter((a: Applicant) => a.gender === value); } else if (type === 'age') { filtered = dashboardApplicants.filter((app: Applicant) => { if (value === '< 18') return app.age < 18; if (value === '18-21') return app.age >= 18 && app.age <= 21; if (value === '22-25') return app.age >= 22 && app.age <= 25; if (value === '26+') return app.age > 25; return false; }); } else if (type === 'education') { filtered = dashboardApplicants.filter((app: Applicant) => { let highestLevel = 'None'; let highestLevelVal = 0; if (app.educations && app.educations.length > 0) { app.educations.forEach(edu => { const levelObj = EDUCATION_LEVELS.find(l => l.label === edu.level); const val = levelObj ? levelObj.level : 0; if (val > highestLevelVal) { highestLevelVal = val; highestLevel = edu.level; } }); } if (app.educations.length === 0 && value === 'None') return true; return highestLevel === value; }); } setDrilldownData({ title: `${type.charAt(0).toUpperCase() + type.slice(1)}: ${value}`, applicants: filtered }); };
+  // --- Actions ---
+  const handleChartClick = (type: 'gender' | 'age' | 'education' | 'status' | 'ranking', value: string) => { if (!value) return; let filtered: Applicant[] = []; if (type === 'status') { filtered = dashboardApplicants.filter((app: Applicant) => { if (value === 'Pending') return [ApplicationStatus.SUBMITTED, ApplicationStatus.DOCS_REJECTED].includes(app.status); if (value === 'Interview') return [ApplicationStatus.DOCS_APPROVED, ApplicationStatus.INTERVIEW_READY, ApplicationStatus.INTERVIEW_BOOKED].includes(app.status); if (value === 'Final') return [ApplicationStatus.PASSED, ApplicationStatus.ENROLLED].includes(app.status); return app.status === value || (value==='Draft' && app.status===ApplicationStatus.DRAFT) || (value==='Failed' && app.status===ApplicationStatus.FAILED); }); } else if (type === 'ranking') { filtered = dashboardApplicants.filter((app: Applicant) => { const score = app.rankingScore || 0; const label = score === 0 ? 'Unranked' : `Rank ${score}`; return label === value; }); } else if (type === 'gender') { filtered = dashboardApplicants.filter((a: Applicant) => a.gender === value); } else if (type === 'age') { filtered = dashboardApplicants.filter((app: Applicant) => { if (value === '< 18') return app.age < 18; if (value === '18-21') return app.age >= 18 && app.age <= 21; if (value === '22-25') return app.age >= 22 && app.age <= 25; if (value === '26+') return app.age > 25; return false; }); } else if (type === 'education') { filtered = dashboardApplicants.filter((app: Applicant) => { let highestLevel = 'None'; let highestLevelVal = 0; if (app.educations && app.educations.length > 0) { app.educations.forEach(edu => { const levelObj = EDUCATION_LEVELS.find(l => l.label === edu.level); const val = levelObj ? levelObj.level : 0; if (val > highestLevelVal) { highestLevelVal = val; highestLevel = edu.level; } }); } if (app.educations.length === 0 && value === 'None') return true; return highestLevel === value; }); } setDrilldownData({ title: `${type.charAt(0).toUpperCase() + type.slice(1)}: ${value}`, applicants: filtered }); };
   const handleSort = (key: string) => { let direction: 'asc' | 'desc' = 'asc'; if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') { direction = 'desc'; } setSortConfig({ key, direction }); };
+  const getUniqueColumnValues = (colId: string) => { const values = new Set<string>(); applicants.forEach(app => { if (colId === 'status') values.add(app.status); else { const val = (app as any)[colId] || app.customData?.[colId]; if (val) values.add(val.toString()); } }); return Array.from(values); };
+  const handleColumnFilter = (colId: string, val: string) => { setColumnFilters(prev => val ? { ...prev, [colId]: val } : (() => { const n = { ...prev }; delete n[colId]; return n; })()); setActiveColumnFilter(null); };
+  
   const filteredApplicants = applicants.filter(app => { 
-      // Role constraints
       if (currentUser.role === StaffRole.REVIEWER && app.reviewerId !== currentUser.id) return false;
-
-      // Filter Logic
       if (minRankFilter > 0 && (app.rankingScore || 0) < minRankFilter) return false; 
-      
-      // Column Filters
       for (const [colKey, colVal] of Object.entries(columnFilters)) {
-          if (colKey === 'status') {
-              if (app.status !== colVal) return false;
-          } else {
-              const cellValue = renderCellContent(app, colKey);
-              // Simple check - in real app, might need more robust value extraction
-              // Here assuming renderCellContent returns simple ReactNodes or strings mostly.
-              // For filtering, better to access raw data.
-              const rawVal = (app as any)[colKey] || app.customData?.[colKey];
-              if (rawVal?.toString() !== colVal) return false;
-          }
+          if (colKey === 'status') { if (app.status !== colVal) return false; } else { const rawVal = (app as any)[colKey] || app.customData?.[colKey]; if (rawVal?.toString() !== colVal) return false; }
       }
-
       if (statusFilter === 'ALL') return true; 
       if (statusFilter === 'PENDING_DOCS') return app.status === ApplicationStatus.SUBMITTED || app.status === ApplicationStatus.DOCS_REJECTED; 
       if (statusFilter === 'INTERVIEW_STAGE') return [ApplicationStatus.DOCS_APPROVED, ApplicationStatus.INTERVIEW_READY, ApplicationStatus.INTERVIEW_BOOKED].includes(app.status); 
@@ -309,6 +290,7 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
       if (statusFilter === 'FAILED') return app.status === ApplicationStatus.FAILED; 
       return true; 
   }).sort((a, b) => { if (a.isStarred && !b.isStarred) return -1; if (!a.isStarred && b.isStarred) return 1; if (sortConfig) { const valA = (a as any)[sortConfig.key] || ''; const valB = (b as any)[sortConfig.key] || ''; if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1; if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1; } return 0; });
+
   const toggleColumn = (id: string) => { setVisibleColumns(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]); };
   const toggleStar = (applicantId: string) => { const app = applicants.find(a => a.id === applicantId); if (app) { saveApplicant({ ...app, isStarred: !app.isStarred }); refreshData(); } };
   const handleUpdateRanking = (applicant: Applicant, score: number) => { saveApplicant({ ...applicant, rankingScore: score }); refreshData(); };
@@ -316,25 +298,14 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
   const handlePublishUpdates = () => { if (!confirm("Are you sure you want to publish all status updates?")) return; applicants.forEach(app => saveApplicant({ ...app, lastNotifiedStatus: app.status })); refreshData(); alert("Updates sent."); };
   const updateDraftFieldRejection = (fieldId: string) => { if (!draftApplicant || isReadOnlyView) return; const current = { ...draftApplicant.fieldRejections }; if (current[fieldId]) delete current[fieldId]; else { const r = prompt("Reason?"); if(r) current[fieldId] = r; } setDraftApplicant({ ...draftApplicant, fieldRejections: current }); setActiveEditField(null); };
   
-  // --- Updated Doc Handlers ---
-  const updateDraftDocStatus = (docId: string, status: DocumentStatus) => { 
-      if (!draftApplicant || isReadOnlyView) return; 
-      let note = "";
-      if (status === DocumentStatus.REJECTED) {
-          note = prompt("Reason for rejection?") || "Rejected";
-      }
-      const docs = { ...draftApplicant.documents }; 
-      docs[docId] = { ...docs[docId], status, reviewNote: note }; 
-      setDraftApplicant({ ...draftApplicant, documents: docs }); 
-  };
-  
+  const updateDraftDocStatus = (docId: string, status: DocumentStatus) => { if (!draftApplicant || isReadOnlyView) return; let note = ""; if (status === DocumentStatus.REJECTED) { note = prompt("Reason?") || "Rejected"; } const docs = { ...draftApplicant.documents }; docs[docId] = { ...docs[docId], status, reviewNote: note }; setDraftApplicant({ ...draftApplicant, documents: docs }); };
   const handleAdminAttachDoc = () => { if (!draftApplicant || !adminDocName || isReadOnlyView) return; const id = `doc_admin_${Date.now()}`; setDraftApplicant({ ...draftApplicant, documents: { ...draftApplicant.documents, [id]: { id, name: adminDocName, status: DocumentStatus.APPROVED, fileName: adminDocFile?.name || 'admin.pdf', uploadedBy: 'admin' } } }); setAdminDocName(''); setAdminDocFile(null); };
   const updateDraftExamGrading = (qid: string, s: number) => { if (!draftApplicant || isReadOnlyView) return; setDraftApplicant({ ...draftApplicant, examGrading: { ...draftApplicant.examGrading, [qid]: s } }); };
   const updateDraftFeeStatus = (t: any, s: FeeStatus) => { if (!draftApplicant || isReadOnlyView) return; setDraftApplicant({ ...draftApplicant, feeStatuses: { ...draftApplicant.feeStatuses!, [t]: s } }); };
-  const saveAndNotifyApplicant = () => { if (!draftApplicant || isReadOnlyView) return; let s = draftApplicant.status; if (s === ApplicationStatus.SUBMITTED) { if ((Object.values(draftApplicant.documents) as DocumentItem[]).some(d => d.status === DocumentStatus.REJECTED)) s = ApplicationStatus.DOCS_REJECTED; } saveApplicant({ ...draftApplicant, status: s }); setSelectedApplicant(null); refreshData(); };
+  const saveAndNotifyApplicant = () => { if (!draftApplicant || isReadOnlyView) return; let s = draftApplicant.status; if (s === ApplicationStatus.SUBMITTED && (Object.values(draftApplicant.documents) as DocumentItem[]).some(d => d.status === DocumentStatus.REJECTED)) s = ApplicationStatus.DOCS_REJECTED; saveApplicant({ ...draftApplicant, status: s }); setSelectedApplicant(null); refreshData(); };
   const handleDecision = (s: ApplicationStatus) => { if (!draftApplicant || isReadOnlyView) return; saveApplicant({ ...draftApplicant, status: s }); setSelectedApplicant(null); refreshData(); };
   
-  // ... (Other Handlers: Form, Slot, Exam - Reused) ...
+  // --- Config Handlers ---
   const handleAddOrUpdateCustomField = () => { const opts = newFieldOptions ? newFieldOptions.split(',').map(s=>s.trim()).filter(s=>s) : undefined; const field = { id: editingFieldId || `cf_${Date.now()}`, label: newFieldLabel, type: newFieldType, options: opts, minScore: Number(newFieldMinScore), maxScore: Number(newFieldMaxScore), description: newFieldDesc, scoreConfig: newFieldType==='score'?scoreConfigList:undefined, itemCount: Number(newFieldItemCount) }; if(editingFieldId) { const configs = fieldConfigs.map(f=>f.id===editingFieldId ? {...f, ...field} : f); saveFieldConfigs(configs); setFieldConfigs(configs); } else { addCustomFieldToConfig(field as any); setFieldConfigs(getFieldConfigs()); } setIsFieldModalOpen(false); };
   const handleEditCustomField = (f: FieldConfig) => { setEditingFieldId(f.id); setNewFieldLabel(f.label); setNewFieldDesc(f.description||''); setNewFieldType(f.type as any); setNewFieldOptions(f.options?.join(', ')||''); setNewFieldMinScore(f.minScore?.toString()||''); setNewFieldMaxScore(f.maxScore?.toString()||''); setScoreConfigList(f.scoreConfig||[]); setNewFieldItemCount(f.itemCount?.toString()||''); setIsFieldModalOpen(true); };
   const openAddFieldModal = () => { setEditingFieldId(null); setNewFieldLabel(''); setNewFieldDesc(''); setNewFieldType('text'); setNewFieldOptions(''); setScoreConfigList([]); setIsFieldModalOpen(true); };
@@ -346,7 +317,9 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
   const handleEditDocLabel = (id: string) => { const l = prompt("New Label:"); if(l) { const u = docConfigs.map(d=>d.id===id?{...d,label:l}:d); saveDocumentConfigs(u); setDocConfigs(u); } };
   const handleAddScoreConfig = () => { if (!newScoreExamName || !newScoreExamMin || !newScoreExamMax) return; setScoreConfigList([...scoreConfigList, { exam: newScoreExamName, min: parseFloat(newScoreExamMin), max: parseFloat(newScoreExamMax) }]); setNewScoreExamName(''); setNewScoreExamMin(''); setNewScoreExamMax(''); };
   const handleRemoveScoreConfig = (index: number) => { const updated = [...scoreConfigList]; updated.splice(index, 1); setScoreConfigList(updated); };
-  const handleSaveSlot = () => { if(!newSlotDate) return; const capacity = parseInt(newSlotCapacity); if (editingSlotId) { const original = interviewSlots.find(s => s.id === editingSlotId); if (original) { if (capacity < original.booked) { alert(`Capacity cannot be less than current bookings (${original.booked}).`); return; } saveInterviewSlot({ ...original, dateTime: `${newSlotDate}T${newSlotTimeStart}:00`, endTime: `${newSlotDate}T${newSlotTimeEnd}:00`, location: newSlotLocation, type: newSlotType, capacity: capacity }); } } else { saveInterviewSlot({ id: `slot_${Date.now()}`, dateTime: `${newSlotDate}T${newSlotTimeStart}:00`, endTime: `${newSlotDate}T${newSlotTimeEnd}:00`, location: newSlotLocation, type: newSlotType, capacity: capacity, booked: 0, groups: [] }); } refreshData(); setIsSlotModalOpen(false); };
+  
+  // --- Slot Handlers ---
+  const handleSaveSlot = () => { if(!newSlotDate) return; const capacity = parseInt(newSlotCapacity); if (editingSlotId) { const original = interviewSlots.find(s => s.id === editingSlotId); if (original) { if (capacity < original.booked) { alert(`Capacity error.`); return; } saveInterviewSlot({ ...original, dateTime: `${newSlotDate}T${newSlotTimeStart}:00`, endTime: `${newSlotDate}T${newSlotTimeEnd}:00`, location: newSlotLocation, type: newSlotType, capacity: capacity }); } } else { saveInterviewSlot({ id: `slot_${Date.now()}`, dateTime: `${newSlotDate}T${newSlotTimeStart}:00`, endTime: `${newSlotDate}T${newSlotTimeEnd}:00`, location: newSlotLocation, type: newSlotType, capacity: capacity, booked: 0, groups: [] }); } refreshData(); setIsSlotModalOpen(false); };
   const handleDeleteSlot = (e: any, id: string) => { e.stopPropagation(); const s = interviewSlots.find(x=>x.id===id); if(s && s.booked > 0) return alert("Has bookings"); if(confirm("Delete?")) { deleteInterviewSlot(id); refreshData(); } };
   const handleCreateGroup = () => { if(selectedSlot) { const u = { ...selectedSlot, groups: [...(selectedSlot.groups||[]), { id: `grp_${Date.now()}`, name: `Group ${(selectedSlot.groups?.length||0)+1}`, applicantIds: [] }] }; saveInterviewSlot(u); refreshData(); } };
   const handleRenameGroup = (e: any, gid: string) => { e.stopPropagation(); if(selectedSlot) { const n = prompt("Name:"); if(n) { const u = { ...selectedSlot, groups: selectedSlot.groups?.map(g=>g.id===gid?{...g,name:n}:g) }; saveInterviewSlot(u); refreshData(); } } };
@@ -354,46 +327,26 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
   const handleMoveApplicantToGroup = (aid: string, gid: string|null) => { if(selectedSlot) { let grps = selectedSlot.groups ? [...selectedSlot.groups] : []; grps = grps.map(g => ({ ...g, applicantIds: g.applicantIds.filter(id=>id!==aid) })); if(gid) { const idx = grps.findIndex(g=>g.id===gid); if(idx!==-1) grps[idx].applicantIds.push(aid); } saveInterviewSlot({ ...selectedSlot, groups: grps }); refreshData(); } };
   const handleMoveApplicantOrder = (aid: string, gid: string, dir: 'up'|'down') => { if(selectedSlot) { const gIdx = selectedSlot.groups?.findIndex(g=>g.id===gid); if(gIdx!==undefined && gIdx!==-1) { const grp = selectedSlot.groups![gIdx]; const aIdx = grp.applicantIds.indexOf(aid); if(aIdx!==-1) { const newIds = [...grp.applicantIds]; if(dir==='up' && aIdx>0) [newIds[aIdx], newIds[aIdx-1]] = [newIds[aIdx-1], newIds[aIdx]]; else if(dir==='down' && aIdx<newIds.length-1) [newIds[aIdx], newIds[aIdx+1]] = [newIds[aIdx+1], newIds[aIdx]]; const newGrps = [...selectedSlot.groups!]; newGrps[gIdx] = { ...grp, applicantIds: newIds }; saveInterviewSlot({ ...selectedSlot, groups: newGrps }); refreshData(); } } } };
   const toggleGroupExpansion = (gid: string) => { const s = new Set(expandedGroupIds); if(s.has(gid)) s.delete(gid); else s.add(gid); setExpandedGroupIds(s); };
-  const handleSwitchApplicantSlot = (applicantId: string, targetSlotId: string) => { if (!selectedSlot || !targetSlotId) return; const targetSlot = interviewSlots.find(s => s.id === targetSlotId); if (!targetSlot || targetSlot.booked >= targetSlot.capacity) return alert("Target slot is full or unavailable."); const app = applicants.find(a => a.id === applicantId); if (!app) return; const updatedApp = { ...app, interviewSlotId: targetSlot.id, interviewSlot: targetSlot.dateTime }; saveApplicant(updatedApp); const updatedCurrentSlot = { ...selectedSlot, booked: Math.max(0, selectedSlot.booked - 1) }; saveInterviewSlot(updatedCurrentSlot); setSelectedSlot(updatedCurrentSlot); saveInterviewSlot({ ...targetSlot, booked: targetSlot.booked + 1 }); refreshData(); alert("Applicant moved successfully."); };
+  const handleSwitchApplicantSlot = (applicantId: string, targetSlotId: string) => { if (!selectedSlot || !targetSlotId) return; const targetSlot = interviewSlots.find(s => s.id === targetSlotId); if (!targetSlot || targetSlot.booked >= targetSlot.capacity) return alert("Target slot is full."); const app = applicants.find(a => a.id === applicantId); if (!app) return; const updatedApp = { ...app, interviewSlotId: targetSlot.id, interviewSlot: targetSlot.dateTime }; saveApplicant(updatedApp); const updatedCurrentSlot = { ...selectedSlot, booked: Math.max(0, selectedSlot.booked - 1) }; saveInterviewSlot(updatedCurrentSlot); setSelectedSlot(updatedCurrentSlot); saveInterviewSlot({ ...targetSlot, booked: targetSlot.booked + 1 }); refreshData(); alert("Moved."); };
   const handleDragStart = (e: any, i: number) => dragItem.current = i; const handleDragEnter = (e: any, i: number) => dragOverItem.current = i; const handleDragEndField = () => { if (dragItem.current!==null && dragOverItem.current!==null) { const c = [...fieldConfigs]; const i = c.splice(dragItem.current, 1)[0]; c.splice(dragOverItem.current, 0, i); saveFieldConfigs(c); setFieldConfigs(c); dragItem.current=null; dragOverItem.current=null; } }; const handleDragStartDoc = (e: any, i: number) => dragItemDoc.current = i; const handleDragEnterDoc = (e: any, i: number) => dragOverItemDoc.current = i; const handleDragEndDoc = () => { if (dragItemDoc.current!==null && dragOverItemDoc.current!==null) { const c = [...docConfigs]; const i = c.splice(dragItemDoc.current, 1)[0]; c.splice(dragOverItemDoc.current, 0, i); saveDocumentConfigs(c); setDocConfigs(c); dragItemDoc.current=null; dragOverItemDoc.current=null; } };
+  
+  // --- Exam & Announcement & User Handlers ---
   const handleEditSuite = (s: ExamSuite) => { setEditingSuiteId(s.id); setSuiteTitle(s.title); setSuiteDesc(s.description); setIsSuiteModalOpen(true); }; const handleSaveSuite = () => { saveExamSuite({ id: editingSuiteId||`s_${Date.now()}`, title: suiteTitle, description: suiteDesc }); setExamSuites(getExamSuites()); setIsSuiteModalOpen(false); }; const handleDeleteSuite = (id: string) => { if(confirm("Delete?")) { deleteExamSuite(id); setExamSuites(getExamSuites()); setSelectedSuite(null); } }; const handleEditQuestion = (q: ExamQuestion) => { setEditingQuestionId(q.id); setQText(q.text); setQType(q.type); setQScore(q.score.toString()); setQIsGraded(q.isGraded!==false); setQOptions(q.options||[]); setIsQuestionModalOpen(true); }; const handleSaveQuestion = () => { if(!selectedSuite) return; saveExam({ id: editingQuestionId||`q_${Date.now()}`, suiteId: selectedSuite.id, text: qText, type: qType, score: qIsGraded ? Number(qScore) : 0, isGraded: qIsGraded, options: qType!==QuestionType.ESSAY?qOptions:undefined }); setSuiteQuestions(getExams().filter(q=>q.suiteId===selectedSuite.id)); setIsQuestionModalOpen(false); }; const handleDeleteQuestion = (id: string) => { if(confirm("Delete?")) { deleteExam(id); setSuiteQuestions(getExams().filter(q=>q.suiteId===selectedSuite?.id)); } }; const handleAddOption = () => setQOptions([...qOptions, { id: `opt_${Date.now()}`, text: '', isCorrect: false }]); const handleAddOtherOption = () => setQOptions([...qOptions, { id: `opt_${Date.now()}`, text: 'Other', isCorrect: false, allowInput: true }]); const handleUpdateOption = (id: string, t: string) => setQOptions(qOptions.map(o=>o.id===id?{...o,text:t}:o)); const handleToggleOption = (id: string) => { if(qType===QuestionType.MCQ_SINGLE) setQOptions(qOptions.map(o=>({...o,isCorrect:o.id===id}))); else setQOptions(qOptions.map(o=>o.id===id?{...o,isCorrect:!o.isCorrect}:o)); }; const handleRemoveOption = (id: string) => setQOptions(qOptions.filter(o=>o.id!==id));
   const handleSaveAnnouncement = () => { if(!newAnnTitle || !newAnnMessage) return; saveAnnouncement({ id: `ann_${Date.now()}`, title: newAnnTitle, message: newAnnMessage, type: newAnnType, timestamp: new Date().toISOString() }); setAnnouncements(getAnnouncements()); setIsAnnouncementModalOpen(false); setNewAnnTitle(''); setNewAnnMessage(''); }; const handleDeleteAnnouncement = (id: string) => { if(confirm("Delete?")) { deleteAnnouncement(id); setAnnouncements(getAnnouncements()); } };
   const togglePaymentSetting = (k: keyof PaymentConfig) => { const c = { ...paymentConfig, [k]: !paymentConfig[k] }; setPaymentConfig(c); savePaymentConfig(c); };
-  
-  // User Management Handlers
   const handleSaveUser = () => { if(!newUserUsername || !newUserFullName) return; const u = { id: editingUserId || `admin_${Date.now()}`, username: newUserUsername, fullName: newUserFullName, role: newUserRole, assignedGroupIds: newUserRole === StaffRole.PROCTOR ? newUserAssignedGroups : undefined }; saveStaffUser(u); refreshData(); setIsUserModalOpen(false); }; const handleDeleteUser = (id: string) => { if(id===currentUser.id) return alert("Cannot delete self."); if(confirm("Delete?")) { deleteStaffUser(id); refreshData(); } }; const openUserModal = (u?: StaffUser) => { if(u) { setEditingUserId(u.id); setNewUserUsername(u.username); setNewUserFullName(u.fullName); setNewUserRole(u.role); setNewUserAssignedGroups(u.assignedGroupIds||[]); } else { setEditingUserId(null); setNewUserUsername(''); setNewUserFullName(''); setNewUserRole(StaffRole.REVIEWER); setNewUserAssignedGroups([]); } setIsUserModalOpen(true); };
   const handleAssignReviewer = (reviewerId: string) => { if (!confirm("Assign to this reviewer?")) return; applicants.forEach(app => { if (filteredApplicants.find(fa => fa.id === app.id)) saveApplicant({ ...app, reviewerId }); }); refreshData(); alert("Assigned."); };
 
+  // Demo Controls
   const demoGenerateApplicant = () => { const a = getApplicants()[0]; saveApplicant({ ...a, id: `u_${Date.now()}`, fullName: `Demo ${Math.floor(Math.random()*100)}`, status: ApplicationStatus.SUBMITTED }); refreshData(); }; const demoApproveCurrentDocs = () => { if(selectedApplicant) { const u = { ...selectedApplicant, status: ApplicationStatus.DOCS_APPROVED }; Object.keys(u.documents).forEach(k=>u.documents[k].status=DocumentStatus.APPROVED); saveApplicant(u); refreshData(); setSelectedApplicant(null); } }; const demoFillScores = () => { if(selectedApplicant) { saveApplicant({ ...selectedApplicant, writtenScore: 85, interviewScore: 90, status: ApplicationStatus.PASSED }); refreshData(); setSelectedApplicant(null); } }; const demoAddApplicantToSlot = () => { if(selectedSlot) { const id = `slot_u_${Date.now()}`; saveApplicant({ ...getApplicants()[0], id, fullName: `Slot User ${Math.floor(Math.random()*100)}`, status: ApplicationStatus.INTERVIEW_BOOKED, interviewSlotId: selectedSlot.id }); bookInterviewSlot(selectedSlot.id, id); refreshData(); alert("Added"); } };
+  
   const slotApplicants = selectedSlot ? applicants.filter(a => a.interviewSlotId === selectedSlot.id) : []; const slotGroups = selectedSlot?.groups || []; const assignedApplicantIds = new Set(slotGroups.flatMap(g => g.applicantIds)); const unassignedApplicants = slotApplicants.filter(a => !assignedApplicantIds.has(a.id)); const isEditingStandardField = editingFieldId ? fieldConfigs.find(f => f.id === editingFieldId)?.isStandard : false; const inputStyle = "w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 text-sm disabled:bg-gray-100 disabled:text-gray-500"; const labelStyle = "block text-sm font-medium text-gray-700 mb-1";
   const openSlotModal = (slot?: InterviewSlot) => { if (slot) { setEditingSlotId(slot.id); setNewSlotDate(slot.dateTime.split('T')[0]); setNewSlotTimeStart(slot.dateTime.split('T')[1].substring(0, 5)); setNewSlotTimeEnd(slot.endTime.split('T')[1].substring(0, 5)); setNewSlotLocation(slot.location); setNewSlotCapacity(slot.capacity.toString()); setNewSlotType(slot.type); } else { setEditingSlotId(null); setSelectedSlot(null); setNewSlotDate(''); setNewSlotTimeStart(''); setNewSlotTimeEnd(''); setNewSlotLocation(''); setNewSlotCapacity('10'); setNewSlotType('Onsite'); } setIsSlotModalOpen(true); }; const closeFieldModal = () => { setIsFieldModalOpen(false); };
-
-  // Calculate Fees Visibility
-  const showApplicationFee = true;
-  const showInterviewFee = draftApplicant && [ApplicationStatus.DOCS_APPROVED, ApplicationStatus.INTERVIEW_READY, ApplicationStatus.INTERVIEW_BOOKED, ApplicationStatus.PASSED, ApplicationStatus.ENROLLED].includes(draftApplicant.status);
-  const showTuitionFee = draftApplicant && [ApplicationStatus.PASSED, ApplicationStatus.ENROLLED].includes(draftApplicant.status);
-
-  // Column Filtering Logic
-  const getUniqueColumnValues = (colId: string) => {
-      const values = new Set<string>();
-      applicants.forEach(app => {
-          if (colId === 'status') values.add(app.status);
-          else {
-              const val = (app as any)[colId] || app.customData?.[colId];
-              if (val) values.add(val.toString());
-          }
-      });
-      return Array.from(values);
-  };
-
-  const handleColumnFilter = (colId: string, val: string) => {
-      setColumnFilters(prev => val ? { ...prev, [colId]: val } : (() => { const n = { ...prev }; delete n[colId]; return n; })());
-      setActiveColumnFilter(null);
-  };
+  const showApplicationFee = true; const showInterviewFee = draftApplicant && [ApplicationStatus.DOCS_APPROVED, ApplicationStatus.INTERVIEW_READY, ApplicationStatus.INTERVIEW_BOOKED, ApplicationStatus.PASSED, ApplicationStatus.ENROLLED].includes(draftApplicant.status); const showTuitionFee = draftApplicant && [ApplicationStatus.PASSED, ApplicationStatus.ENROLLED].includes(draftApplicant.status);
 
   return (
     <div className="min-h-screen bg-gray-100 flex font-sans pb-20 md:pb-0">
-      {/* Sidebar (Existing Code) */}
+      {/* Sidebar */}
       <div className="w-64 bg-gray-900 text-white hidden md:block fixed h-full shadow-xl z-10">
         <div className="p-6 font-bold text-xl text-brand-500 flex items-center space-x-2 border-b border-gray-800">
           <span>Admin Portal</span>
@@ -470,7 +423,6 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
 
         {view === 'dashboard' && (
           <div className="space-y-6 max-w-7xl mx-auto">
-            {/* ... Dashboard Content (Reused) ... */}
             <div className="flex flex-col sm:flex-row justify-between items-end gap-4 mb-2"><h2 className="text-3xl font-bold text-gray-900">Dashboard Overview</h2></div>
             <div className="flex bg-white rounded-xl p-1 shadow-sm border border-gray-200 overflow-x-auto w-fit mb-4">{['ALL', 'PENDING', 'INTERVIEW', 'FINAL', 'FAILED'].map(stage => (<button key={stage} onClick={() => setDashboardStatusFilter(stage)} className={`px-6 py-2 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${dashboardStatusFilter === stage ? 'bg-gray-900 text-white shadow-md' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}>{stage}</button>))}</div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6"><div className="bg-gradient-to-br from-white to-blue-50 p-6 rounded-xl shadow-sm border border-blue-100 flex items-center justify-between"><div><div className="text-blue-500 text-xs font-bold uppercase tracking-wider mb-1">Total Applicants</div><div className="text-3xl font-extrabold text-gray-900">{stats.total}</div></div><div className="p-3 bg-blue-100 rounded-full text-blue-600"><Users className="w-6 h-6"/></div></div><div className="bg-gradient-to-br from-white to-yellow-50 p-6 rounded-xl shadow-sm border border-yellow-100 flex items-center justify-between"><div><div className="text-yellow-600 text-xs font-bold uppercase tracking-wider mb-1">Pending Review</div><div className="text-3xl font-extrabold text-gray-900">{stats.pendingDocs}</div></div><div className="p-3 bg-yellow-100 rounded-full text-yellow-600"><Clock className="w-6 h-6"/></div></div><div className="bg-gradient-to-br from-white to-purple-50 p-6 rounded-xl shadow-sm border border-purple-100 flex items-center justify-between"><div><div className="text-purple-600 text-xs font-bold uppercase tracking-wider mb-1">Interview Ready</div><div className="text-3xl font-extrabold text-gray-900">{stats.interviewReady}</div></div><div className="p-3 bg-purple-100 rounded-full text-purple-600"><Calendar className="w-6 h-6"/></div></div><div className="bg-gradient-to-br from-white to-green-50 p-6 rounded-xl shadow-sm border border-green-100 flex items-center justify-between"><div><div className="text-green-600 text-xs font-bold uppercase tracking-wider mb-1">Passed</div><div className="text-3xl font-extrabold text-gray-900">{stats.passed}</div></div><div className="p-3 bg-green-100 rounded-full text-green-600"><Trophy className="w-6 h-6"/></div></div></div>
@@ -573,7 +525,7 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
           </div>
         )}
 
-        {view === 'appointments' && (/* ... Existing Appointments Code ... */
+        {view === 'appointments' && (
             <div className="space-y-6 max-w-7xl mx-auto">
                 {selectedSlot ? (
                     <div className="space-y-6">
@@ -583,9 +535,7 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
                             <select className="h-8 text-xs border border-gray-300 rounded bg-white px-2 text-gray-900 cursor-pointer min-w-[90px]" value="" onChange={(e) => handleSwitchApplicantSlot(app.id, e.target.value)}><option value="" disabled>Change Slot</option>{interviewSlots.filter(s => s.id !== selectedSlot.id && s.booked < s.capacity).map(s => (<option key={s.id} value={s.id}>{new Date(s.dateTime).toLocaleDateString()} {new Date(s.dateTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</option>))}</select></div></div>))}</div></div>
                             <div className="lg:col-span-2 space-y-4"><div className="flex justify-between items-center"><h3 className="font-bold text-gray-800">Groups</h3>{currentUser.role !== StaffRole.PROCTOR && <Button size="sm" onClick={handleCreateGroup}><Plus className="w-4 h-4 mr-2"/> Create Group</Button>}</div>{slotGroups.length === 0 ? (<div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-xl text-gray-400">No groups created.</div>) : (<div className="grid grid-cols-1 gap-4">{slotGroups.map(group => { 
                                 const isExpanded = expandedGroupIds.has(group.id); 
-                                // Proctor Constraint: Can only see assigned groups
                                 if (currentUser.role === StaffRole.PROCTOR && !currentUser.assignedGroupIds?.includes(group.id)) return null;
-
                                 return (<div key={group.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"><div className="flex justify-between items-center p-4 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => toggleGroupExpansion(group.id)}><div className="flex items-center gap-3">{isExpanded ? <ChevronUp className="w-5 h-5 text-gray-500"/> : <ChevronDown className="w-5 h-5 text-gray-500"/>}<div><h4 className="font-bold text-brand-700 flex items-center gap-2 group/title">{group.name}</h4><span className="text-xs text-gray-500">{group.applicantIds.length} Applicants</span></div></div><div className="flex items-center gap-2">{currentUser.role !== StaffRole.PROCTOR && (<><button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteGroup(group.id); }} className="text-gray-400 hover:text-red-500 p-1.5" title="Delete"><Trash2 className="w-4 h-4"/></button><button type="button" onClick={(e) => handleRenameGroup(e, group.id)} className="text-gray-400 hover:text-brand-600 p-1.5" title="Rename"><Pencil className="w-4 h-4"/></button></>)}</div></div>{isExpanded && (<div className="p-4 border-t border-gray-200 bg-white">{group.applicantIds.length > 0 ? (<div className="space-y-2">{group.applicantIds.map((appId, index) => { const app = applicants.find(a => a.id === appId); if (!app) return null; return (<div key={appId} className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-100 hover:border-brand-200"><div className="flex items-center gap-3"><div className="w-6 h-6 rounded-full bg-brand-100 flex items-center justify-center text-xs font-bold text-brand-700">{index + 1}</div><div><div className="text-sm font-bold text-gray-900">{app.fullName}</div><div className="text-xs text-gray-500"><button onClick={() => { setSelectedApplicant(app); setIsReadOnlyView(true); }} className="text-brand-600 hover:underline">View Profile</button></div></div></div><div className="flex items-center gap-2">{currentUser.role !== StaffRole.PROCTOR && (<><div className="flex flex-col gap-1 mr-2"><button onClick={() => handleMoveApplicantOrder(appId, group.id, 'up')} disabled={index === 0} className="text-gray-400 hover:text-gray-600 disabled:opacity-30"><ArrowUp className="w-3 h-3"/></button><button onClick={() => handleMoveApplicantOrder(appId, group.id, 'down')} disabled={index === group.applicantIds.length - 1} className="text-gray-400 hover:text-gray-600 disabled:opacity-30"><ArrowDown className="w-3 h-3"/></button></div><button onClick={() => handleMoveApplicantToGroup(appId, null)} className="text-gray-400 hover:text-red-500" title="Remove"><X className="w-4 h-4"/></button></>)}</div></div>); })}</div>) : (<p className="text-sm text-gray-400 italic text-center py-4">No applicants.</p>)}</div>)}</div>);})}</div>)}</div>
                         </div>
                     </div>
@@ -598,28 +548,25 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
             </div>
         )}
 
-        {view === 'exams' && ( /* ... Existing Exams Code ... */
+        {view === 'exams' && (
             <div className="space-y-6 max-w-7xl mx-auto flex flex-col h-[calc(100vh-140px)]">
                 <div className="flex justify-between items-center"><h2 className="text-3xl font-bold text-gray-900">Exam Management</h2></div>
                 <div className="flex gap-6 h-full"><div className="w-1/3 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col"><div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 rounded-t-xl"><h3 className="font-bold text-brand-600 flex items-center"><ClipboardList className="w-4 h-4 mr-2"/>Exam Suites</h3><Button size="sm" onClick={() => { setIsSuiteModalOpen(true); setEditingSuiteId(null); setSuiteTitle(''); setSuiteDesc(''); }}><Plus className="w-4 h-4 mr-1"/> New Suite</Button></div><div className="flex-1 overflow-y-auto p-2 space-y-2">{examSuites.map(suite => (<div key={suite.id} onClick={() => setSelectedSuite(suite)} className={`p-4 rounded-lg cursor-pointer border transition-all ${selectedSuite?.id === suite.id ? 'bg-brand-50 border-brand-500 ring-1 ring-brand-500' : 'bg-white border-gray-200 hover:bg-gray-50'}`}><div className="flex justify-between items-center"><h4 className={`font-bold text-sm ${selectedSuite?.id === suite.id ? 'text-brand-700' : 'text-gray-900'}`}>{suite.title}</h4><div className="flex gap-2"><button onClick={(e) => { e.stopPropagation(); handleEditSuite(suite); }} className={DS.actionIcon.primary} title="Edit"><Pencil className="w-4 h-4"/></button><button onClick={(e) => { e.stopPropagation(); handleDeleteSuite(suite.id); }} className={DS.actionIcon.danger} title="Delete"><Trash2 className="w-4 h-4"/></button></div></div><p className="text-xs text-gray-500 truncate">{suite.description}</p></div>))}</div></div><div className="w-2/3 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col">{selectedSuite ? (<><div className="p-4 border-b bg-gray-50 flex justify-between items-center"><h3 className="font-bold text-gray-800 flex items-center"><BookOpen className="w-4 h-4 mr-2 text-brand-600"/>Questions ({suiteQuestions.length})</h3><Button size="sm" onClick={() => { setIsQuestionModalOpen(true); setEditingQuestionId(null); setQText(''); setQOptions([]); setQIsGraded(true); setQScore('5'); }}><Plus className="w-4 h-4"/> Add</Button></div><div className="flex-1 overflow-y-auto p-4 space-y-4">{suiteQuestions.map((q, idx) => (<div key={q.id} className="border rounded-lg p-4 relative group hover:border-brand-300 transition-colors"><div className="flex justify-between mb-2"><div className="flex items-center gap-2"><span className="font-bold text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">Q{idx+1} ({q.type})</span>{!q.isGraded && <span className="font-bold text-xs bg-yellow-100 px-2 py-1 rounded text-yellow-700">Not Graded</span>}</div><div className="flex gap-2"><button onClick={() => handleEditQuestion(q)} className={DS.actionIcon.primary}><Pencil className="w-4 h-4"/></button><button onClick={() => handleDeleteQuestion(q.id)} className={DS.actionIcon.danger}><Trash2 className="w-4 h-4"/></button></div></div><p className="text-sm font-medium text-gray-900">{q.text}</p>{q.type !== QuestionType.ESSAY && (<ul className="mt-2 pl-4 list-disc text-xs text-gray-500">{q.options?.map(o => (<li key={o.id} className={o.isCorrect && q.isGraded ? 'text-green-600 font-bold' : ''}>{o.text} {o.allowInput && <span className="text-gray-400 italic">(User Input)</span>}</li>))}</ul>)}</div>))}</div></>) : <div className="flex-1 flex flex-col items-center justify-center text-gray-400"><BookOpen className="w-12 h-12 mb-2 opacity-20"/>Select a suite to manage questions</div>}</div></div></div>
         )}
 
-        {view === 'form-builder' && ( /* ... Existing Form Builder Code ... */
+        {view === 'form-builder' && (
             <div className="space-y-6 max-w-7xl mx-auto"><div className="flex justify-between items-center"><h2 className="text-3xl font-bold text-gray-900">Form Builder</h2></div><div className="grid grid-cols-1 lg:grid-cols-2 gap-6"><div className="space-y-4"><div className="flex justify-between items-center"><h3 className="text-xl font-bold text-gray-800 flex items-center"><LayoutGrid className="w-5 h-5 mr-2 text-brand-600"/> Profile Fields</h3><Button onClick={openAddFieldModal} size="sm" className="flex items-center"><Plus className="w-4 h-4 mr-2"/> Add Field</Button></div><div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 space-y-2 min-h-[300px]">{fieldConfigs.map((field, index) => (<div key={field.id} className="p-3 border rounded flex justify-between items-center bg-white hover:border-brand-300 transition-colors cursor-move group" draggable onDragStart={(e) => handleDragStart(e, index)} onDragEnter={(e) => handleDragEnter(e, index)} onDragEnd={handleDragEndField}><div className="flex items-center gap-3"><GripVertical className="text-gray-400 cursor-grab" /><div><span className="font-bold text-gray-900 text-sm">{field.label}</span><span className="ml-2 text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-600 uppercase">{field.type}</span></div></div><div className="flex gap-2 items-center"><button onClick={() => handleEditCustomField(field)} className={DS.actionIcon.primary} title="Edit"><Pencil className="w-4 h-4"/></button><button onClick={() => toggleFieldVisibility(field.id)} className={DS.actionIcon.neutral} title="Toggle Visibility">{field.isHidden ? <EyeOff className="w-4 h-4"/> : <Eye className="w-4 h-4"/>}</button>{!field.isStandard && <button onClick={() => handleDeleteCustomField(field.id)} className={DS.actionIcon.danger} title="Delete"><Trash2 className="w-4 h-4"/></button>}</div></div>))}</div></div><div className="space-y-4"><div className="flex justify-between items-center"><h3 className="text-xl font-bold text-gray-800 flex items-center"><Upload className="w-5 h-5 mr-2 text-brand-600"/> Document Requirements</h3><Button onClick={handleAddDocumentConfig} size="sm" className="flex items-center"><Plus className="w-4 h-4 mr-2"/> Add Document</Button></div><div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 space-y-2 min-h-[300px]">{docConfigs.map((doc, index) => (<div key={doc.id} className="p-3 border rounded flex justify-between items-center bg-white hover:border-brand-300 transition-colors cursor-move group" draggable onDragStart={(e) => handleDragStartDoc(e, index)} onDragEnter={(e) => handleDragEnterDoc(e, index)} onDragEnd={handleDragEndDoc}><div className="flex items-center gap-3"><GripVertical className="text-gray-400 cursor-grab" /><div><span className="font-bold text-gray-900 text-sm">{doc.label}</span>{doc.isStandard && <span className="ml-2 text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded uppercase border border-blue-200">Standard</span>}</div></div><div className="flex gap-2 items-center"><button onClick={() => handleEditDocLabel(doc.id)} className={DS.actionIcon.primary} title="Edit Label"><Pencil className="w-4 h-4"/></button><button onClick={() => handleToggleDocVisibility(doc.id)} className={DS.actionIcon.neutral} title="Toggle Visibility">{doc.isHidden ? <EyeOff className="w-4 h-4"/> : <Eye className="w-4 h-4"/>}</button>{!doc.isStandard && <button onClick={() => handleDeleteDocumentConfig(doc.id)} className={DS.actionIcon.danger} title="Delete"><Trash2 className="w-4 h-4"/></button>}</div></div>))}</div></div></div></div>
         )}
 
-        {/* ... Announcements (Existing) ... */}
         {view === 'announcements' && (
             <div className="space-y-6 max-w-7xl mx-auto"><div className="flex justify-between items-center"><h2 className="text-3xl font-bold text-gray-900">Announcements</h2><Button onClick={() => setIsAnnouncementModalOpen(true)} className="flex items-center"><Plus className="w-4 h-4 mr-2"/> Create Notice</Button></div><div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"><div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center"><h3 className="font-bold text-gray-700">System Messages</h3><span className="text-xs text-gray-500">{announcements.length} messages</span></div><div className="p-4 space-y-4">{announcements.length === 0 ? (<div className="text-center py-8 text-gray-400">No announcements yet.</div>) : (announcements.map(ann => (<div key={ann.id} className="p-4 border rounded-lg bg-white flex justify-between items-start hover:shadow-md transition-shadow"><div className="flex gap-4"><div className={`p-2 rounded-full h-fit mt-1 ${ann.type === 'urgent' ? 'bg-red-100 text-red-600' : ann.type === 'success' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}><Megaphone className="w-5 h-5"/></div><div><h4 className="font-bold text-gray-900 text-lg">{ann.title}</h4><p className="text-gray-600 mt-1">{ann.message}</p><div className="flex items-center gap-2 mt-2"><span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${ann.type === 'urgent' ? 'bg-red-100 text-red-700' : ann.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{ann.type}</span><span className="text-xs text-gray-400">{new Date(ann.timestamp).toLocaleString()}</span></div></div></div><button onClick={() => handleDeleteAnnouncement(ann.id)} className="text-gray-400 hover:text-red-500 p-2 rounded-full hover:bg-gray-100"><Trash2 className="w-5 h-5"/></button></div>)))}</div></div></div>
         )}
 
-        {/* ... Settings (Existing) ... */}
         {view === 'settings' && (
             <div className="space-y-6 max-w-7xl mx-auto"><h2 className="text-3xl font-bold text-gray-900">Settings</h2><div className="grid grid-cols-1 md:grid-cols-2 gap-6"><div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200"><h3 className="font-bold mb-4 flex items-center text-gray-900"><CreditCard className="w-5 h-5 mr-2 text-brand-600"/> Payment Methods</h3><div className="space-y-4">{['kplus', 'qrcode'].map(key => (<div key={key} className="flex justify-between items-center p-3 border rounded bg-gray-50"><span className="uppercase font-medium text-sm text-gray-700">{key}</span><button onClick={() => togglePaymentSetting(key as any)} className={`flex items-center px-3 py-1 rounded-full text-xs font-bold transition-colors ${paymentConfig[key as any] ? 'bg-brand-600 text-white' : 'bg-gray-300 text-gray-600'}`}>{paymentConfig[key as any] ? <ToggleRight className="w-4 h-4 mr-1"/> : <ToggleLeft className="w-4 h-4 mr-1"/>}{paymentConfig[key as any] ? 'Enabled' : 'Disabled'}</button></div>))}</div></div><div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200"><h3 className="font-bold mb-4 flex items-center text-gray-900"><DollarSign className="w-5 h-5 mr-2 text-brand-600"/> Fees Requirement</h3><div className="space-y-4">{['requireApplicationFee', 'requireInterviewFee', 'requireTuitionFee'].map(key => (<div key={key} className="flex justify-between items-center p-3 border rounded bg-gray-50"><span className="capitalize font-medium text-sm text-gray-700">{key.replace('require', '').replace('Fee', ' Fee')}</span><button onClick={() => togglePaymentSetting(key as any)} className={`flex items-center px-3 py-1 rounded-full text-xs font-bold transition-colors ${paymentConfig[key as any] ? 'bg-brand-600 text-white' : 'bg-gray-300 text-gray-600'}`}>{paymentConfig[key as any] ? <ToggleRight className="w-4 h-4 mr-1"/> : <ToggleLeft className="w-4 h-4 mr-1"/>}{paymentConfig[key as any] ? 'Required' : 'Optional'}</button></div>))}</div></div></div></div>
         )}
 
         {/* --- MODALS --- */}
-        {/* User Modal */}
         {isUserModalOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl">
@@ -646,7 +593,6 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
             </div>
         )}
 
-        {/* Field Modal (Existing) */}
         {isFieldModalOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl max-h-[90vh] overflow-y-auto">
@@ -674,33 +620,28 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
             </div>
         )}
 
-        {/* Drill-down, Slot, Announcement Modals (Existing) ... */}
         {drilldownData && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh] shadow-2xl animate-fade-in"><div className="p-4 border-b border-gray-200 bg-gray-900 text-white flex justify-between items-center"><div><h3 className="font-bold text-lg">{drilldownData.title}</h3><span className="text-xs text-gray-400">{drilldownData.applicants.length} Applicants</span></div><button onClick={() => setDrilldownData(null)}><X className="w-5 h-5 text-gray-400 hover:text-white"/></button></div><div className="flex-1 overflow-y-auto p-4 bg-gray-50">{drilldownData.applicants.length > 0 ? (<div className="space-y-3">{drilldownData.applicants.map(app => (<div key={app.id} className="p-4 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow flex justify-between items-center"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 font-bold">{app.fullName ? app.fullName.charAt(0) : 'U'}</div><div><div className="font-bold text-sm text-gray-900">{app.fullName}</div><span className={`text-[10px] px-2 py-0.5 rounded-full border ${DS.status[app.status]}`}>{app.status}</span></div></div><Button size="sm" variant="outline" onClick={() => { setSelectedApplicant(app); setDrilldownData(null); setIsReadOnlyView(true); }}>View</Button></div>))}</div>) : (<div className="text-center py-8 text-gray-400">No applicants found in this category.</div>)}</div></div></div>)}
         {isSlotModalOpen && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl animate-fade-in"><h3 className="text-xl font-bold mb-4">{editingSlotId ? 'Edit Slot' : 'Create Interview Slot'}</h3><div className="space-y-3"><div><label className={labelStyle}>Date</label><input type="date" className={inputStyle} value={newSlotDate} onChange={e=>setNewSlotDate(e.target.value)} /></div><div className="grid grid-cols-2 gap-4"><div><label className={labelStyle}>Start Time</label><input type="time" className={inputStyle} value={newSlotTimeStart} onChange={e=>setNewSlotTimeStart(e.target.value)} /></div><div><label className={labelStyle}>End Time</label><input type="time" className={inputStyle} value={newSlotTimeEnd} onChange={e=>setNewSlotTimeEnd(e.target.value)} /></div></div><div><label className={labelStyle}>Type</label><select className={inputStyle} value={newSlotType} onChange={e=>setNewSlotType(e.target.value as any)}><option value="Onsite">Onsite</option><option value="Online">Online</option></select></div><div><label className={labelStyle}>Location / Link</label><input type="text" className={inputStyle} value={newSlotLocation} onChange={e=>setNewSlotLocation(e.target.value)} placeholder={newSlotType==='Online'?'Zoom Link':'Room Number'} /></div><div><label className={labelStyle}>Capacity</label><input type="number" className={inputStyle} value={newSlotCapacity} onChange={e=>setNewSlotCapacity(e.target.value)} /></div></div><div className="mt-6 flex justify-end space-x-2"><Button variant="secondary" onClick={() => setIsSlotModalOpen(false)}>Cancel</Button><Button onClick={handleSaveSlot}>Save Slot</Button></div></div></div>)}
         {isAnnouncementModalOpen && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl"><h3 className="text-xl font-bold mb-4">Create Announcement</h3><div className="space-y-3"><div><label className={labelStyle}>Title</label><input type="text" className={inputStyle} value={newAnnTitle} onChange={e=>setNewAnnTitle(e.target.value)} /></div><div><label className={labelStyle}>Type</label><select className={inputStyle} value={newAnnType} onChange={e=>setNewAnnType(e.target.value as any)}><option value="info">Info (Blue)</option><option value="urgent">Urgent (Red)</option><option value="success">Success (Green)</option></select></div><div><label className={labelStyle}>Message</label><textarea className={inputStyle} rows={3} value={newAnnMessage} onChange={e=>setNewAnnMessage(e.target.value)} /></div></div><div className="mt-6 flex justify-end space-x-2"><Button variant="secondary" onClick={() => setIsAnnouncementModalOpen(false)}>Cancel</Button><Button onClick={handleSaveAnnouncement}>Post</Button></div></div></div>)}
         {isSuiteModalOpen && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl"><h3 className="text-xl font-bold mb-4">{editingSuiteId ? 'Edit Suite' : 'Create Exam Suite'}</h3><div className="space-y-3"><div><label className={labelStyle}>Title</label><input type="text" className={inputStyle} value={suiteTitle} onChange={e=>setSuiteTitle(e.target.value)} /></div><div><label className={labelStyle}>Description</label><textarea className={inputStyle} rows={3} value={suiteDesc} onChange={e=>setSuiteDesc(e.target.value)} /></div></div><div className="mt-6 flex justify-end space-x-2"><Button variant="secondary" onClick={() => setIsSuiteModalOpen(false)}>Cancel</Button><Button onClick={handleSaveSuite}>Save</Button></div></div></div>)}
         {isQuestionModalOpen && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-lg p-6 w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto"><h3 className="text-xl font-bold mb-4">{editingQuestionId ? 'Edit Question' : 'Add Question'}</h3><div className="space-y-3"><div><label className={labelStyle}>Question Text</label><textarea className={inputStyle} rows={2} value={qText} onChange={e=>setQText(e.target.value)} /></div><div className="flex gap-4"> <div className="w-1/2"><label className={labelStyle}>Type</label><select className={inputStyle} value={qType} onChange={e=>setQType(e.target.value as any)}><option value={QuestionType.MCQ_SINGLE}>Multiple Choice (Single)</option><option value={QuestionType.MCQ_MULTI}>Multiple Choice (Multi)</option><option value={QuestionType.ESSAY}>Essay</option></select></div><div className="w-1/2 pt-6"><label className="flex items-center"><input type="checkbox" checked={qIsGraded} onChange={e=>setQIsGraded(e.target.checked)} className="mr-2"/> Graded Question</label></div></div>{qIsGraded && (<div><label className={labelStyle}>Score</label><input type="number" className={inputStyle} value={qScore} onChange={e=>setQScore(e.target.value)} /></div>)}{qType !== QuestionType.ESSAY && (<div className="border p-3 rounded bg-gray-50"><div className="flex justify-between mb-2"><span className="text-sm font-bold">Options</span><div className="flex gap-2"><Button size="sm" variant="secondary" onClick={handleAddOtherOption} className="text-xs">+ 'Other'</Button><Button size="sm" onClick={handleAddOption} className="text-xs">+ Option</Button></div></div><div className="space-y-2">{qOptions.map((opt, idx) => (<div key={opt.id} className="flex gap-2 items-center"><input type={qType===QuestionType.MCQ_SINGLE?'radio':'checkbox'} name="correct-opt" checked={opt.isCorrect} onChange={() => handleToggleOption(opt.id)} disabled={!qIsGraded} title="Mark Correct"/><input type="text" className="flex-1 border rounded p-1.5 text-sm" value={opt.text} onChange={e=>handleUpdateOption(opt.id, e.target.value)} placeholder={opt.allowInput ? "User Input (Other)" : `Option ${idx+1}`} disabled={opt.allowInput} /><button onClick={() => handleRemoveOption(opt.id)} className="text-red-500"><Trash2 className="w-4 h-4"/></button></div>))}</div></div>)}</div><div className="mt-6 flex justify-end space-x-2"><Button variant="secondary" onClick={() => setIsQuestionModalOpen(false)}>Cancel</Button><Button onClick={handleSaveQuestion}>Save</Button></div></div></div>)}
 
-        {/* Review Modal (Draft Mode) - REFACTORED */}
+        {/* Review Modal */}
         {selectedApplicant && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-xl w-full max-w-4xl h-[90vh] flex flex-col shadow-2xl animate-fade-in overflow-hidden">
-                    {/* Header */}
                     <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
                         <div><h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">{selectedApplicant.fullName} {isReadOnlyView && <span className="bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded">Read Only</span>}</h3><div className="flex gap-2 mt-1"><span className={`px-2 py-0.5 text-xs rounded border ${DS.status[selectedApplicant.status]}`}>{selectedApplicant.status}</span></div></div>
                         <button onClick={() => setSelectedApplicant(null)} className="text-gray-400 hover:text-gray-600"><X className="w-6 h-6"/></button>
                     </div>
                     
-                    {/* Tabs */}
                     {!isReadOnlyView && (
                         <div className="flex border-b border-gray-200 bg-white">
                             {['profile', 'docs', 'exam', 'fees', 'evaluation'].map(t => (<button key={t} onClick={() => setReviewTab(t as any)} className={`flex-1 py-3 text-sm font-bold border-b-2 transition-colors capitalize ${reviewTab === t ? 'border-brand-600 text-brand-600 bg-brand-50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>{t}</button>))}
                         </div>
                     )}
 
-                    {/* Content */}
                     <div className="flex-1 overflow-y-auto p-6 bg-white">
-                        {/* Profile Tab */}
                         {(reviewTab === 'profile' || isReadOnlyView) && (
                             <div className="space-y-6">
                                 <div className="grid grid-cols-2 gap-4">
@@ -723,10 +664,8 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
                             </div>
                         )}
 
-                        {/* Docs Tab (Updated UI & Logic) */}
                         {reviewTab === 'docs' && !isReadOnlyView && (
                             <div className="space-y-6">
-                                {/* Legal Declaration Moved Here */}
                                 <div className="border rounded-lg p-4 bg-gray-50 flex justify-between items-center mb-4">
                                     <div className="flex items-center gap-3">
                                         <div className="bg-brand-100 p-2 rounded-full"><ScrollText className="w-5 h-5 text-brand-600"/></div>
@@ -740,7 +679,6 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
                                 </div>
                                 {showSignature && selectedApplicant.signatureImage && (<div className="p-4 border rounded bg-white flex justify-center mb-4"><img src={selectedApplicant.signatureImage} alt="Signature" className="max-h-32"/></div>)}
 
-                                {/* Documents List */}
                                 <h4 className="font-bold text-gray-800 mb-2">Submitted Documents</h4>
                                 {Object.values(draftApplicant?.documents || {}).map((doc: any) => (
                                     <div key={doc.id} className="flex justify-between items-center p-4 border rounded-lg bg-white shadow-sm mb-2">
@@ -769,7 +707,6 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
                                     </div>
                                 ))}
 
-                                {/* Attach Admin Doc */}
                                 <div className="mt-6 bg-gray-50 p-4 rounded-xl border border-gray-200">
                                     <h4 className="font-bold text-gray-800 mb-3 flex items-center"><FilePlus className="w-4 h-4 mr-2 text-brand-600"/> Attach Admin Document</h4>
                                     <div className="flex gap-3 items-center">
@@ -784,32 +721,16 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
                             </div>
                         )}
 
-                        {/* Exam Tab (Updated UI & Grouping) */}
                         {reviewTab === 'exam' && !isReadOnlyView && (
                             <div className="space-y-8">
                                 <div className="flex justify-between items-center bg-gray-900 text-white p-4 rounded-xl shadow-md">
                                     <div><div className="text-xs font-bold uppercase text-gray-400">Total Score</div><div className="text-3xl font-bold">{selectedApplicant.examScore || 0}</div></div>
                                     <div className="text-right"><div className="text-xs font-bold uppercase text-gray-400">Written Score</div><input type="number" className="bg-transparent border-b border-gray-600 text-white font-bold text-2xl w-24 text-right focus:outline-none focus:border-white" value={draftApplicant?.writtenScore || 0} onChange={(e) => setDraftApplicant({...draftApplicant!, writtenScore: Number(e.target.value)})} placeholder="0" /></div>
                                 </div>
-                                
                                 {examSuites.map(suite => {
                                     const qs = allQuestions.filter(q => q.suiteId === suite.id);
                                     if(qs.length === 0) return null;
-                                    // Calculate Suite Score
-                                    const suiteScore = qs.reduce((acc, q) => {
-                                        const graded = draftApplicant?.examGrading?.[q.id]; // Essay manual score
-                                        if (graded !== undefined) return acc + graded;
-                                        // Auto calc for MCQ (Simplified logic re-check)
-                                        const ans = draftApplicant?.examAnswers?.[q.id];
-                                        if (!ans) return acc;
-                                        if (q.type === QuestionType.MCQ_SINGLE) {
-                                            const correct = q.options?.find(o => o.isCorrect)?.id;
-                                            if (ans === correct) return acc + q.score;
-                                        }
-                                        // Multi logic omitted for brevity, assuming backend calc usually
-                                        return acc;
-                                    }, 0); // Note: This is an estimation for display
-
+                                    const suiteScore = qs.reduce((acc, q) => { const graded = draftApplicant?.examGrading?.[q.id]; if (graded !== undefined) return acc + graded; const ans = draftApplicant?.examAnswers?.[q.id]; if (!ans) return acc; if (q.type === QuestionType.MCQ_SINGLE) { const correct = q.options?.find(o => o.isCorrect)?.id; if (ans === correct) return acc + q.score; } return acc; }, 0);
                                     return (
                                         <div key={suite.id} className="space-y-4">
                                             <div className="flex items-center justify-between border-b border-gray-200 pb-2">
@@ -820,24 +741,11 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
                                                 const answer = draftApplicant?.examAnswers?.[q.id];
                                                 return (
                                                     <div key={q.id} className="p-4 border rounded-lg bg-white shadow-sm">
-                                                        <div className="flex justify-between mb-2">
-                                                            <span className="font-bold text-gray-900">Q{i+1}: {q.text}</span>
-                                                            <span className="text-xs font-bold bg-gray-100 px-2 py-1 rounded text-gray-500">{q.type} | Max: {q.score}</span>
-                                                        </div>
-                                                        <div className="text-sm text-gray-700 bg-gray-50 p-3 rounded mb-2 border border-gray-100">
-                                                            <span className="font-bold text-gray-500 text-xs uppercase block mb-1">User Answer</span>
-                                                            {Array.isArray(answer) ? answer.join(', ') : answer || '-'}
-                                                        </div>
+                                                        <div className="flex justify-between mb-2"><span className="font-bold text-gray-900">Q{i+1}: {q.text}</span><span className="text-xs font-bold bg-gray-100 px-2 py-1 rounded text-gray-500">{q.type} | Max: {q.score}</span></div>
+                                                        <div className="text-sm text-gray-700 bg-gray-50 p-3 rounded mb-2 border border-gray-100"><span className="font-bold text-gray-500 text-xs uppercase block mb-1">User Answer</span>{Array.isArray(answer) ? answer.join(', ') : answer || '-'}</div>
                                                         {q.type === QuestionType.ESSAY ? (
-                                                            <div className="flex items-center gap-3 mt-2 bg-yellow-50 p-2 rounded border border-yellow-100">
-                                                                <span className="text-sm font-bold text-yellow-800">Manual Grading:</span>
-                                                                <input type="number" className="w-20 border border-yellow-300 rounded p-1 text-sm text-center font-bold" value={draftApplicant?.examGrading?.[q.id] || 0} onChange={(e) => updateDraftExamGrading(q.id, Number(e.target.value))} />
-                                                                <span className="text-xs text-gray-500">/ {q.score}</span>
-                                                            </div>
-                                                        ) : (
-                                                            /* Show correct answer logic could be here */
-                                                            <div className="text-xs text-green-600 mt-1 flex items-center"><Check className="w-3 h-3 mr-1"/> Auto-graded</div>
-                                                        )}
+                                                            <div className="flex items-center gap-3 mt-2 bg-yellow-50 p-2 rounded border border-yellow-100"><span className="text-sm font-bold text-yellow-800">Manual Grading:</span><input type="number" className="w-20 border border-yellow-300 rounded p-1 text-sm text-center font-bold" value={draftApplicant?.examGrading?.[q.id] || 0} onChange={(e) => updateDraftExamGrading(q.id, Number(e.target.value))} /><span className="text-xs text-gray-500">/ {q.score}</span></div>
+                                                        ) : (<div className="text-xs text-green-600 mt-1 flex items-center"><Check className="w-3 h-3 mr-1"/> Auto-graded</div>)}
                                                     </div>
                                                 );
                                             })}
@@ -847,32 +755,15 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
                             </div>
                         )}
 
-                        {/* Fees Tab (Stage-based Visibility) */}
                         {reviewTab === 'fees' && !isReadOnlyView && (
                             <div className="space-y-4">
-                                {showApplicationFee && (
-                                    <div className="flex justify-between items-center p-4 border rounded bg-white">
-                                        <div className="font-bold capitalize text-gray-900">Application Fee</div>
-                                        <select value={draftApplicant?.feeStatuses?.application} onChange={(e) => updateDraftFeeStatus('application', e.target.value as FeeStatus)} className={`border rounded p-1 text-sm font-bold ${draftApplicant?.feeStatuses?.application === 'PAID' ? 'text-green-600 bg-green-50' : 'text-yellow-600 bg-yellow-50'}`}><option value="PENDING">Pending</option><option value="PAID">Paid</option><option value="REJECTED">Rejected</option></select>
-                                    </div>
-                                )}
-                                {showInterviewFee && (
-                                    <div className="flex justify-between items-center p-4 border rounded bg-white">
-                                        <div className="font-bold capitalize text-gray-900">Interview Fee</div>
-                                        <select value={draftApplicant?.feeStatuses?.interview} onChange={(e) => updateDraftFeeStatus('interview', e.target.value as FeeStatus)} className={`border rounded p-1 text-sm font-bold ${draftApplicant?.feeStatuses?.interview === 'PAID' ? 'text-green-600 bg-green-50' : 'text-yellow-600 bg-yellow-50'}`}><option value="PENDING">Pending</option><option value="PAID">Paid</option><option value="REJECTED">Rejected</option></select>
-                                    </div>
-                                )}
-                                {showTuitionFee && (
-                                    <div className="flex justify-between items-center p-4 border rounded bg-white">
-                                        <div className="font-bold capitalize text-gray-900">Tuition Fee</div>
-                                        <select value={draftApplicant?.feeStatuses?.tuition} onChange={(e) => updateDraftFeeStatus('tuition', e.target.value as FeeStatus)} className={`border rounded p-1 text-sm font-bold ${draftApplicant?.feeStatuses?.tuition === 'PAID' ? 'text-green-600 bg-green-50' : 'text-yellow-600 bg-yellow-50'}`}><option value="PENDING">Pending</option><option value="PAID">Paid</option><option value="REJECTED">Rejected</option></select>
-                                    </div>
-                                )}
+                                {showApplicationFee && (<div className="flex justify-between items-center p-4 border rounded bg-white"><div className="font-bold capitalize text-gray-900">Application Fee</div><select value={draftApplicant?.feeStatuses?.application} onChange={(e) => updateDraftFeeStatus('application', e.target.value as FeeStatus)} className={`border rounded p-1 text-sm font-bold ${draftApplicant?.feeStatuses?.application === 'PAID' ? 'text-green-600 bg-green-50' : 'text-yellow-600 bg-yellow-50'}`}><option value="PENDING">Pending</option><option value="PAID">Paid</option><option value="REJECTED">Rejected</option></select></div>)}
+                                {showInterviewFee && (<div className="flex justify-between items-center p-4 border rounded bg-white"><div className="font-bold capitalize text-gray-900">Interview Fee</div><select value={draftApplicant?.feeStatuses?.interview} onChange={(e) => updateDraftFeeStatus('interview', e.target.value as FeeStatus)} className={`border rounded p-1 text-sm font-bold ${draftApplicant?.feeStatuses?.interview === 'PAID' ? 'text-green-600 bg-green-50' : 'text-yellow-600 bg-yellow-50'}`}><option value="PENDING">Pending</option><option value="PAID">Paid</option><option value="REJECTED">Rejected</option></select></div>)}
+                                {showTuitionFee && (<div className="flex justify-between items-center p-4 border rounded bg-white"><div className="font-bold capitalize text-gray-900">Tuition Fee</div><select value={draftApplicant?.feeStatuses?.tuition} onChange={(e) => updateDraftFeeStatus('tuition', e.target.value as FeeStatus)} className={`border rounded p-1 text-sm font-bold ${draftApplicant?.feeStatuses?.tuition === 'PAID' ? 'text-green-600 bg-green-50' : 'text-yellow-600 bg-yellow-50'}`}><option value="PENDING">Pending</option><option value="PAID">Paid</option><option value="REJECTED">Rejected</option></select></div>)}
                                 {!showInterviewFee && !showTuitionFee && !showApplicationFee && <div className="text-center text-gray-400 py-8">No active fees for this stage.</div>}
                             </div>
                         )}
 
-                        {/* Evaluation Tab */}
                         {reviewTab === 'evaluation' && !isReadOnlyView && (
                             <div className="space-y-4">
                                 <h4 className="font-bold">Final Assessment</h4>
@@ -882,12 +773,10 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
                         )}
                     </div>
 
-                    {/* Footer Actions */}
                     {!isReadOnlyView && (
                         <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-between items-center">
                             <div className="text-xs text-gray-500">Changes are drafted. Click Save to apply.</div>
                             <div className="flex gap-2">
-                                {/* Workflow Actions */}
                                 {[ApplicationStatus.SUBMITTED, ApplicationStatus.DOCS_REJECTED].includes(selectedApplicant.status) && (
                                     <><Button size="sm" className="bg-red-600 hover:bg-red-700" onClick={() => handleDecision(ApplicationStatus.FAILED)}>Fail Applicant</Button><Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleDecision(ApplicationStatus.DOCS_APPROVED)}>Pass to Interview</Button></>
                                 )}
@@ -902,7 +791,6 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
             </div>
         )}
 
-        {/* Footer Admin Controls */}
         <div className="fixed bottom-0 right-0 p-4 flex gap-2 z-50">
             {view === 'applicants' && (<Button size="sm" className="bg-gray-800 shadow-lg text-xs" onClick={demoGenerateApplicant}><UserPlus className="w-3 h-3 mr-1"/> New Applicant (Submitted)</Button>)}
             {selectedApplicant && !isReadOnlyView && selectedApplicant.status === ApplicationStatus.SUBMITTED && (<Button size="sm" className="bg-green-700 shadow-lg text-xs" onClick={demoApproveCurrentDocs}><Check className="w-3 h-3 mr-1"/> Auto Approve Docs</Button>)}

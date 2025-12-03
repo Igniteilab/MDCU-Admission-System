@@ -120,9 +120,20 @@ export interface EducationRecord {
   endYear?: string;
 }
 
+export interface Recommender {
+  name: string;
+  email: string;
+  company: string;
+  relation: string;
+}
+
 export interface Applicant {
   id: string;
-  fullName: string;
+  fullName: string; // Computed or Legacy
+  title?: string;
+  firstName?: string;
+  lastName?: string;
+  
   age: number;
   gender: Gender;
   email: string;

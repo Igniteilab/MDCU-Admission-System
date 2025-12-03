@@ -144,6 +144,9 @@ const INITIAL_APPLICANTS: Applicant[] = [
   {
     id: 'user_1',
     fullName: 'John Doe',
+    title: 'Mr.',
+    firstName: 'John',
+    lastName: 'Doe',
     age: 20,
     birthDate: '2003-05-15',
     gender: Gender.MALE,
@@ -177,6 +180,9 @@ const INITIAL_APPLICANTS: Applicant[] = [
   {
     id: 'user_2',
     fullName: 'Jane Smith',
+    title: 'Miss',
+    firstName: 'Jane',
+    lastName: 'Smith',
     age: 22,
     birthDate: '2001-08-20',
     gender: Gender.FEMALE,
@@ -209,6 +215,9 @@ const INITIAL_APPLICANTS: Applicant[] = [
    {
     id: 'user_3',
     fullName: 'Alice Walker',
+    title: 'Miss',
+    firstName: 'Alice',
+    lastName: 'Walker',
     age: 19,
     birthDate: '2004-02-10',
     gender: Gender.FEMALE,
@@ -314,7 +323,10 @@ export const getApplicants = (): Applicant[] => {
           isStarred: app.isStarred || false,
           rankingScore: app.rankingScore || 0,
           lastNotifiedStatus: app.lastNotifiedStatus || app.status,
-          reviewerId: app.reviewerId || null
+          reviewerId: app.reviewerId || null,
+          title: app.title || '',
+          firstName: app.firstName || '',
+          lastName: app.lastName || ''
       }));
   } catch (e) {
       return INITIAL_APPLICANTS;
@@ -623,6 +635,9 @@ export const createNewApplicant = (): Applicant => {
   const newApplicant: Applicant = {
     id: newId,
     fullName: '',
+    title: '',
+    firstName: '',
+    lastName: '',
     age: 0,
     gender: Gender.OTHER,
     email: '',
