@@ -236,7 +236,21 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
   }, [fieldConfigs, docConfigs]);
 
   const renderCellContent = (app: Applicant, colId: string) => {
-      if (colId === 'reviewerId') { const r = staffUsers.find(u => u.id === app.reviewerId); return r ? <span className="text-xs bg-gray-100 px-2 py-1 rounded border">{r.fullName}</span> : <span className="text-xs text-gray-400">-</span>; }
+      if (colId === 'reviewerId') { 
+          const r = staffUsers.find(u => u.id === app.reviewerId); 
+          if (currentUser.role === StaffRole.SUPER_ADMIN && r) {
+              return (
+                  <button 
+                      onClick={(e) => { e.stopPropagation(); handleColumnFilter('reviewerId', r.id); }}
+                      className="text-xs bg-gray-100 px-2 py-1 rounded border hover:bg-brand-100 hover:text-brand-700 hover:border-brand-300 transition-colors"
+                      title="Filter by this Admin"
+                  >
+                      {r.fullName}
+                  </button>
+              );
+          }
+          return r ? <span className="text-xs bg-gray-100 px-2 py-1 rounded border">{r.fullName}</span> : <span className="text-xs text-gray-400">-</span>; 
+      }
       if (colId.startsWith('doc_')) { const confId = colId.replace('doc_', ''); const doc = Object.values(app.documents).find(d => d.configId === confId); const status = doc ? doc.status : 'missing'; let color = 'bg-gray-100 text-gray-500'; if (status === DocumentStatus.APPROVED) color = 'bg-green-100 text-green-700'; if (status === DocumentStatus.REJECTED) color = 'bg-red-100 text-red-700'; if (status === DocumentStatus.UPLOADED) color = 'bg-yellow-100 text-yellow-800'; return <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${color}`}>{status}</span>; }
       if (['examScore', 'writtenScore', 'interviewScore'].includes(colId)) { const val = (app as any)[colId]; return val !== undefined ? val : '-'; }
       if ((app as any)[colId] !== undefined) { const val = (app as any)[colId]; if (colId === 'educations') { return (val as any[] || []).map(e => e.level).join(', '); } return val; }
@@ -278,7 +292,8 @@ export const StaffDashboard: React.FC<Props> = ({ currentUser, onLogout }) => {
   const handleColumnFilter = (colId: string, val: string) => { setColumnFilters(prev => val ? { ...prev, [colId]: val } : (() => { const n = { ...prev }; delete n[colId]; return n; })()); setActiveColumnFilter(null); };
   
   const filteredApplicants = applicants.filter(app => { 
-      if (currentUser.role === StaffRole.REVIEWER && app.reviewerId !== currentUser.id) return false;
+      // Restriction removed: Admin can see all data
+      // if (currentUser.role === StaffRole.REVIEWER && app.reviewerId !== currentUser.id) return false;
       if (minRankFilter > 0 && (app.rankingScore || 0) < minRankFilter) return false; 
       for (const [colKey, colVal] of Object.entries(columnFilters)) {
           if (colKey === 'status') { if (app.status !== colVal) return false; } else { const rawVal = (app as any)[colKey] || app.customData?.[colKey]; if (rawVal?.toString() !== colVal) return false; }

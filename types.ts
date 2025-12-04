@@ -43,6 +43,7 @@ export interface DocumentConfig {
   label: string;
   isStandard: boolean; // true if it cannot be deleted
   isHidden: boolean;
+  isRequired: boolean; // New: Configurable requirement
   order: number;
 }
 
@@ -55,6 +56,7 @@ export interface CustomFieldDefinition {
   type: CustomFieldType;
   options?: string[]; // For dropdowns, radio, checkbox groups, or Exam Names for 'score' type
   required?: boolean;
+  placeholder?: string;
   minScore?: number;
   maxScore?: number;
   description?: string; // Help text
@@ -71,6 +73,8 @@ export interface FieldConfig {
   options?: string[];
   isStandard: boolean; // true if it cannot be deleted (only hidden)
   isHidden: boolean;
+  isRequired: boolean; // New: Configurable requirement
+  placeholder?: string; // New: Configurable placeholder
   order: number;
   minScore?: number;
   maxScore?: number;

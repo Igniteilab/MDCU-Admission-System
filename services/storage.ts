@@ -246,16 +246,16 @@ const INITIAL_APPLICANTS: Applicant[] = [
 ];
 
 const INITIAL_FIELD_CONFIGS: FieldConfig[] = [
-    { id: 'fullName', label: 'Full Name', type: 'standard', isStandard: true, isHidden: false, order: 0 },
-    { id: 'birthDate', label: 'Date of Birth', type: 'standard', isStandard: true, isHidden: false, order: 1 },
-    { id: 'age', label: 'Age', type: 'standard', isStandard: true, isHidden: false, order: 2 },
-    { id: 'gender', label: 'Gender', type: 'standard', isStandard: true, isHidden: false, order: 3 },
-    { id: 'phone', label: 'Phone', type: 'standard', isStandard: true, isHidden: false, order: 4 },
-    { id: 'email', label: 'Email', type: 'standard', isStandard: true, isHidden: false, order: 5 },
-    { id: 'address', label: 'Address', type: 'standard', isStandard: true, isHidden: false, order: 6 },
-    { id: 'educations', label: 'Education History', type: 'standard', isStandard: true, isHidden: false, order: 7 },
+    { id: 'fullName', label: 'Full Name', type: 'standard', isStandard: true, isHidden: false, order: 0, isRequired: true, placeholder: 'Enter your first name' },
+    { id: 'birthDate', label: 'Date of Birth', type: 'standard', isStandard: true, isHidden: false, order: 1, isRequired: true },
+    { id: 'age', label: 'Age', type: 'standard', isStandard: true, isHidden: false, order: 2, isRequired: true },
+    { id: 'gender', label: 'Gender', type: 'standard', isStandard: true, isHidden: false, order: 3, isRequired: true },
+    { id: 'phone', label: 'Phone', type: 'standard', isStandard: true, isHidden: false, order: 4, isRequired: true, placeholder: '081-234-5678' },
+    { id: 'email', label: 'Email', type: 'standard', isStandard: true, isHidden: false, order: 5, isRequired: true, placeholder: 'you@example.com' },
+    { id: 'address', label: 'Address', type: 'standard', isStandard: true, isHidden: false, order: 6, isRequired: true, placeholder: 'House No, Street, City, Zipcode' },
+    { id: 'educations', label: 'Education History', type: 'standard', isStandard: true, isHidden: false, order: 7, isRequired: true },
     // Custom Fields
-    { id: 'cf_1', label: 'Nickname', type: 'text', isStandard: false, isHidden: false, order: 8 },
+    { id: 'cf_1', label: 'Nickname', type: 'text', isStandard: false, isHidden: false, order: 8, isRequired: false, placeholder: 'e.g. John' },
     { 
         id: 'cf_2', 
         label: 'English Score', 
@@ -271,7 +271,8 @@ const INITIAL_FIELD_CONFIGS: FieldConfig[] = [
         allowNoScore: true,
         isStandard: true, 
         isHidden: false, 
-        order: 9 
+        order: 9,
+        isRequired: true
     },
     { 
         id: 'recommendations', 
@@ -281,16 +282,16 @@ const INITIAL_FIELD_CONFIGS: FieldConfig[] = [
         isHidden: false, 
         order: 10, 
         itemCount: 3, 
-        description: 'Please provide names of your recommenders.' 
+        description: 'Please provide names of your recommenders.',
+        isRequired: true
     }
 ];
 
 const INITIAL_DOC_CONFIGS: DocumentConfig[] = [
-    { id: 'doc_conf_pic', label: 'Profile Picture', isStandard: true, isHidden: false, order: 0 },
-    // Transcript removed from initial doc configs as per user request history, keeping it out.
-    { id: 'doc_conf_id', label: 'ID Card Copy', isStandard: true, isHidden: false, order: 2 },
-    { id: 'doc_conf_edu', label: 'Education Certificate', isStandard: true, isHidden: false, order: 3 },
-    { id: 'doc_conf_eng', label: 'English Score Report', isStandard: true, isHidden: false, order: 4 },
+    { id: 'doc_conf_pic', label: 'Profile Picture', isStandard: true, isHidden: false, order: 0, isRequired: true },
+    { id: 'doc_conf_id', label: 'ID Card Copy', isStandard: true, isHidden: false, order: 2, isRequired: true },
+    { id: 'doc_conf_edu', label: 'Education Certificate', isStandard: true, isHidden: false, order: 3, isRequired: true },
+    { id: 'doc_conf_eng', label: 'English Score Report', isStandard: true, isHidden: false, order: 4, isRequired: true },
 ];
 
 const INITIAL_PAYMENT_CONFIG: PaymentConfig = {
@@ -434,148 +435,16 @@ export const bookInterviewSlot = (slotId: string, applicantId: string): boolean 
     const slots = getInterviewSlots();
     const slotIndex = slots.findIndex(s => s.id === slotId);
     
-    if (slotIndex === -1) return false;
-    if (slots[slotIndex].booked >= slots[slotIndex].capacity) return false;
-
-    // Decrement old slot if exists
-    const applicant = getApplicantById(applicantId);
-    if (applicant?.interviewSlotId) {
-        const oldSlotIndex = slots.findIndex(s => s.id === applicant.interviewSlotId);
-        if (oldSlotIndex !== -1) {
-            slots[oldSlotIndex].booked = Math.max(0, slots[oldSlotIndex].booked - 1);
+    if (slotIndex >= 0) {
+        const slot = slots[slotIndex];
+        if (slot.booked < slot.capacity) {
+            slot.booked += 1;
+            slots[slotIndex] = slot;
+            localStorage.setItem(STORAGE_KEY_INTERVIEW_SLOTS, JSON.stringify(slots));
+            return true;
         }
     }
-
-    slots[slotIndex].booked += 1;
-    localStorage.setItem(STORAGE_KEY_INTERVIEW_SLOTS, JSON.stringify(slots));
-    return true;
-};
-
-// --- Field Layout Management ---
-
-export const getFieldConfigs = (): FieldConfig[] => {
-  const stored = localStorage.getItem(STORAGE_KEY_FIELD_CONFIGS);
-  if (!stored) {
-    const defaults = [...INITIAL_FIELD_CONFIGS].sort((a,b) => a.order - b.order);
-    localStorage.setItem(STORAGE_KEY_FIELD_CONFIGS, JSON.stringify(defaults));
-    return defaults;
-  }
-  return JSON.parse(stored).sort((a: FieldConfig, b: FieldConfig) => a.order - b.order);
-};
-
-export const saveFieldConfigs = (configs: FieldConfig[]): void => {
-    const sorted = configs.map((c, idx) => ({ ...c, order: idx }));
-    localStorage.setItem(STORAGE_KEY_FIELD_CONFIGS, JSON.stringify(sorted));
-};
-
-export const addCustomFieldToConfig = (def: CustomFieldDefinition): void => {
-    const configs = getFieldConfigs();
-    const maxOrder = Math.max(...configs.map(c => c.order), 0);
-    const newConfig: FieldConfig = {
-        id: def.id,
-        label: def.label,
-        type: def.type,
-        options: def.options,
-        isStandard: false,
-        isHidden: false,
-        order: maxOrder + 1,
-        minScore: def.minScore,
-        maxScore: def.maxScore,
-        description: def.description,
-        scoreConfig: def.scoreConfig,
-        allowNoScore: def.allowNoScore,
-        itemCount: def.itemCount
-    };
-    configs.push(newConfig);
-    saveFieldConfigs(configs);
-};
-
-export const getCustomFields = (): CustomFieldDefinition[] => {
-  return getFieldConfigs().filter(f => !f.isStandard).map(f => ({
-      id: f.id,
-      label: f.label,
-      type: f.type as CustomFieldType,
-      options: f.options,
-      minScore: f.minScore,
-      maxScore: f.maxScore,
-      description: f.description,
-      allowNoScore: f.allowNoScore,
-      itemCount: f.itemCount
-  }));
-};
-
-export const deleteCustomField = (id: string): void => {
-    const configs = getFieldConfigs().filter(f => f.id !== id);
-    saveFieldConfigs(configs);
-};
-
-// --- Document Config Helpers ---
-
-export const getDocumentConfigs = (): DocumentConfig[] => {
-    const stored = localStorage.getItem(STORAGE_KEY_DOC_CONFIGS);
-    if (!stored) {
-        const defaults = [...INITIAL_DOC_CONFIGS].sort((a,b) => a.order - b.order);
-        localStorage.setItem(STORAGE_KEY_DOC_CONFIGS, JSON.stringify(defaults));
-        return defaults;
-    }
-    return JSON.parse(stored).sort((a: DocumentConfig, b: DocumentConfig) => a.order - b.order);
-};
-
-export const saveDocumentConfigs = (configs: DocumentConfig[]): void => {
-    const sorted = configs.map((c, idx) => ({ ...c, order: idx }));
-    localStorage.setItem(STORAGE_KEY_DOC_CONFIGS, JSON.stringify(sorted));
-};
-
-export const addDocumentConfig = (label: string): void => {
-    const configs = getDocumentConfigs();
-    const maxOrder = Math.max(...configs.map(c => c.order), 0);
-    const newDoc: DocumentConfig = {
-        id: `doc_conf_${Date.now()}`,
-        label,
-        isStandard: false,
-        isHidden: false,
-        order: maxOrder + 1
-    };
-    configs.push(newDoc);
-    saveDocumentConfigs(configs);
-};
-
-export const deleteDocumentConfig = (id: string): void => {
-    const configs = getDocumentConfigs().filter(c => c.id !== id);
-    saveDocumentConfigs(configs);
-};
-
-// --- Education Majors Helpers ---
-export const getEducationMajors = (): string[] => {
-    const stored = localStorage.getItem(STORAGE_KEY_EDUCATION_MAJORS);
-    if (!stored) {
-        return INITIAL_EDUCATION_MAJORS;
-    }
-    try {
-        const parsed = JSON.parse(stored);
-        return Array.isArray(parsed) ? parsed : INITIAL_EDUCATION_MAJORS;
-    } catch {
-        return INITIAL_EDUCATION_MAJORS;
-    }
-};
-
-export const saveEducationMajors = (majors: string[]): void => {
-    localStorage.setItem(STORAGE_KEY_EDUCATION_MAJORS, JSON.stringify(majors));
-};
-
-// --- Payment Config Helpers ---
-
-export const getPaymentConfig = (): PaymentConfig => {
-  const stored = localStorage.getItem(STORAGE_KEY_PAYMENT_CONFIG);
-  if (!stored) {
-    localStorage.setItem(STORAGE_KEY_PAYMENT_CONFIG, JSON.stringify(INITIAL_PAYMENT_CONFIG));
-    return INITIAL_PAYMENT_CONFIG;
-  }
-  return JSON.parse(stored);
-};
-
-export const savePaymentConfig = (config: PaymentConfig): void => {
-  localStorage.setItem(STORAGE_KEY_PAYMENT_CONFIG, JSON.stringify(config));
+    return false;
 };
 
 // --- Announcement Helpers ---
@@ -591,11 +460,7 @@ export const getAnnouncements = (): Announcement[] => {
 export const saveAnnouncement = (ann: Announcement): void => {
     const anns = getAnnouncements();
     const idx = anns.findIndex(a => a.id === ann.id);
-    if (idx >= 0) {
-        anns[idx] = ann;
-    } else {
-        anns.unshift(ann); // Add to top
-    }
+    if(idx >= 0) anns[idx] = ann; else anns.unshift(ann);
     localStorage.setItem(STORAGE_KEY_ANNOUNCEMENTS, JSON.stringify(anns));
 };
 
@@ -617,11 +482,7 @@ export const getStaffUsers = (): StaffUser[] => {
 export const saveStaffUser = (user: StaffUser): void => {
     const users = getStaffUsers();
     const idx = users.findIndex(u => u.id === user.id);
-    if (idx >= 0) {
-        users[idx] = user;
-    } else {
-        users.push(user);
-    }
+    if(idx >= 0) users[idx] = user; else users.push(user);
     localStorage.setItem(STORAGE_KEY_STAFF_USERS, JSON.stringify(users));
 };
 
@@ -630,6 +491,96 @@ export const deleteStaffUser = (id: string): void => {
     localStorage.setItem(STORAGE_KEY_STAFF_USERS, JSON.stringify(users));
 };
 
+// --- Custom Fields Helpers ---
+
+export const getFieldConfigs = (): FieldConfig[] => {
+  const stored = localStorage.getItem(STORAGE_KEY_FIELD_CONFIGS);
+  if (!stored) {
+    localStorage.setItem(STORAGE_KEY_FIELD_CONFIGS, JSON.stringify(INITIAL_FIELD_CONFIGS));
+    return INITIAL_FIELD_CONFIGS;
+  }
+  return JSON.parse(stored);
+};
+
+export const saveFieldConfigs = (configs: FieldConfig[]): void => {
+  localStorage.setItem(STORAGE_KEY_FIELD_CONFIGS, JSON.stringify(configs));
+};
+
+export const addCustomFieldToConfig = (field: FieldConfig): void => {
+  const configs = getFieldConfigs();
+  const index = configs.findIndex(f => f.id === field.id);
+  if (index >= 0) {
+    configs[index] = field;
+  } else {
+    // Add to end but before recommendations if desired, or just push
+    field.order = configs.length;
+    configs.push(field);
+  }
+  localStorage.setItem(STORAGE_KEY_FIELD_CONFIGS, JSON.stringify(configs));
+};
+
+export const deleteCustomField = (id: string): void => {
+  const configs = getFieldConfigs().filter(f => f.id !== id);
+  localStorage.setItem(STORAGE_KEY_FIELD_CONFIGS, JSON.stringify(configs));
+};
+
+// --- Document Config Helpers ---
+
+export const getDocumentConfigs = (): DocumentConfig[] => {
+    const stored = localStorage.getItem(STORAGE_KEY_DOC_CONFIGS);
+    if (!stored) {
+        localStorage.setItem(STORAGE_KEY_DOC_CONFIGS, JSON.stringify(INITIAL_DOC_CONFIGS));
+        return INITIAL_DOC_CONFIGS;
+    }
+    return JSON.parse(stored);
+};
+
+export const saveDocumentConfigs = (configs: DocumentConfig[]): void => {
+    localStorage.setItem(STORAGE_KEY_DOC_CONFIGS, JSON.stringify(configs));
+};
+
+export const addDocumentConfig = (label: string): void => {
+    const configs = getDocumentConfigs();
+    const newId = `doc_conf_${Date.now()}`;
+    configs.push({ id: newId, label, isStandard: false, isHidden: false, order: configs.length, isRequired: true });
+    localStorage.setItem(STORAGE_KEY_DOC_CONFIGS, JSON.stringify(configs));
+};
+
+export const deleteDocumentConfig = (id: string): void => {
+    const configs = getDocumentConfigs().filter(c => c.id !== id);
+    localStorage.setItem(STORAGE_KEY_DOC_CONFIGS, JSON.stringify(configs));
+};
+
+// --- Education Majors ---
+export const getEducationMajors = (): string[] => {
+    const stored = localStorage.getItem(STORAGE_KEY_EDUCATION_MAJORS);
+    if(!stored) {
+        localStorage.setItem(STORAGE_KEY_EDUCATION_MAJORS, JSON.stringify(INITIAL_EDUCATION_MAJORS));
+        return INITIAL_EDUCATION_MAJORS;
+    }
+    return JSON.parse(stored);
+};
+
+export const saveEducationMajors = (majors: string[]): void => {
+    localStorage.setItem(STORAGE_KEY_EDUCATION_MAJORS, JSON.stringify(majors));
+};
+
+// --- Payment Config Helpers ---
+
+export const getPaymentConfig = (): PaymentConfig => {
+  const stored = localStorage.getItem(STORAGE_KEY_PAYMENT_CONFIG);
+  if (!stored) {
+    localStorage.setItem(STORAGE_KEY_PAYMENT_CONFIG, JSON.stringify(INITIAL_PAYMENT_CONFIG));
+    return INITIAL_PAYMENT_CONFIG;
+  }
+  return JSON.parse(stored);
+};
+
+export const savePaymentConfig = (config: PaymentConfig): void => {
+  localStorage.setItem(STORAGE_KEY_PAYMENT_CONFIG, JSON.stringify(config));
+};
+
+// Create a new empty applicant for demo purposes
 export const createNewApplicant = (): Applicant => {
   const newId = `user_${Date.now()}`;
   const newApplicant: Applicant = {
@@ -645,15 +596,12 @@ export const createNewApplicant = (): Applicant => {
     address: '',
     educations: [], 
     status: ApplicationStatus.DRAFT,
-    lastNotifiedStatus: ApplicationStatus.DRAFT,
     examAnswers: {},
     documents: JSON.parse(JSON.stringify(MOCK_DOCS_TEMPLATE)),
     customData: {},
     feeStatuses: { ...DEFAULT_FEE_STATUSES },
     fieldRejections: {},
-    examGrading: {},
-    isStarred: false,
-    rankingScore: 0
+    examGrading: {}
   };
   saveApplicant(newApplicant);
   return newApplicant;
