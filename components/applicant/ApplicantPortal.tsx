@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+/* Removed non-existent InterviewQuestion member from types import */
 import { Applicant, ApplicationStatus, DocumentStatus, QuestionType, DocumentItem, Gender, PaymentConfig, EducationRecord, FieldConfig, ExamSuite, InterviewSlot, Announcement, FeeStatus, Recommender } from '../../types';
 import { getExams, saveApplicant, getExamSuites, MOCK_DOCS_TEMPLATE, getFieldConfigs, getPaymentConfig, savePaymentConfig, EDUCATION_LEVELS, getInterviewSlots, bookInterviewSlot, getDocumentConfigs, getAnnouncements } from '../../services/storage';
 import { Button } from '../ui/Button';
@@ -7,7 +8,7 @@ import {
   CheckCircle, AlertCircle, Clock, Upload, FileText, Calendar, 
   Check, X, User, FileCheck, CreditCard, PenTool, Settings, RefreshCw, Wand2, Trash2, ChevronLeft, ArrowRight,
   Smartphone, QrCode, Image as ImageIcon, ToggleLeft, ToggleRight, GraduationCap, AlertTriangle, Mail, MapPin, Phone, Plus,
-  Globe, Bell, LogOut, HelpCircle, Award, MessageSquare, DollarSign, ZoomIn, ZoomOut, Move, FileDown, Shield, Trophy
+  Globe, Bell, LogOut, HelpCircle, Award, MessageSquare, DollarSign, ZoomIn, ZoomOut, Move, FileDown, Shield, Trophy, UserX
 } from 'lucide-react';
 
 interface Props {
@@ -27,8 +28,8 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
   const [activeSubSection, setActiveSubSection] = useState<ApplicationSubSection>('profile');
   const [formData, setFormData] = useState(applicant);
   const [eSignChecked, setESignChecked] = useState(applicant.isESigned || false);
-  const [pdpaChecked, setPdpaChecked] = useState(false); // New PDPA State
-  const [isPdpaModalOpen, setIsPdpaModalOpen] = useState(false); // New PDPA Modal State
+  const [pdpaChecked, setPdpaChecked] = useState(false);
+  const [isPdpaModalOpen, setIsPdpaModalOpen] = useState(false);
   const [isPayLoading, setIsPayLoading] = useState(false);
   const [forceEditMode, setForceEditMode] = useState(false);
   
@@ -38,15 +39,20 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
   const [isNotiDropdownOpen, setIsNotiDropdownOpen] = useState(false);
   const [currentLang, setCurrentLang] = useState<'EN' | 'TH'>('EN');
 
-  // Field Config State (for dynamic rendering and order)
+  // Field Config State
   const [fieldConfigs, setFieldConfigs] = useState<FieldConfig[]>([]);
   const [docConfigs, setDocConfigs] = useState<any[]>([]);
 
-  // Exam Suites State (Dynamic)
+  // Exam Suites State
   const [examSuites, setExamSuites] = useState<ExamSuite[]>([]);
 
-  // Interview Slots (Dynamic)
+  // Interview Slots State
   const [interviewSlots, setInterviewSlots] = useState<InterviewSlot[]>([]);
+  const [tempWrittenSlotId, setTempWrittenSlotId] = useState<string | null>(null);
+  const [tempInterviewSlotId, setTempInterviewSlotId] = useState<string | null>(null);
+  const [isSlotConfirmed, setIsSlotConfirmed] = useState(false);
+  const [interviewDeclarationChecked, setInterviewDeclarationChecked] = useState(false);
+  const [hasAcknowledgedScreening, setHasAcknowledgedScreening] = useState(false);
 
   // Announcements
   const [systemAnnouncements, setSystemAnnouncements] = useState<Announcement[]>([]);
@@ -54,10 +60,9 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
   // Education Logic State
   const [newEduLevel, setNewEduLevel] = useState<string>(EDUCATION_LEVELS[0].label);
 
-  // New state to handle view navigation without changing status (e.g., going back to fix docs)
+  // New state to handle view navigation without changing status
   const [viewStepOverride, setViewStepOverride] = useState<number | null>(null);
 
-  // --- Missing Variables Implementation ---
   const steps = [
     { id: 1, name: 'Application' },
     { id: 2, name: 'Verification' },
@@ -87,7 +92,7 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
   const [slipFile, setSlipFile] = useState<File | null>(null);
   const [slipPreview, setSlipPreview] = useState<string | null>(null);
 
-  // Payment Configuration State (fetched from storage)
+  // Payment Configuration State
   const [paymentConfig, setPaymentConfig] = useState<PaymentConfig>({ kplus: true, qrcode: true });
 
   const togglePaymentMethod = (method: 'kplus' | 'qrcode') => {
@@ -101,7 +106,7 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
-  // --- Image Cropper State ---
+  // Image Cropper State
   const [isCropOpen, setIsCropOpen] = useState(false);
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [cropScale, setCropScale] = useState(1);
@@ -109,24 +114,17 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
   const [isDraggingCrop, setIsDraggingCrop] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const cropImgRef = useRef<HTMLImageElement>(null);
-  // ---------------------------
 
   // Exam Logic State
   const [selectedSuiteId, setSelectedSuiteId] = useState<string | null>(null);
-  
-  // Specific state for "Other" title input
   const [otherTitle, setOtherTitle] = useState('');
-
   const exams = getExams();
 
-  // --- Computed State for Restricted Editing ---
-  // If status is DOCS_REJECTED, user can ONLY edit rejected documents. Everything else is read-only.
   const isEditRestricted = displayStatus === ApplicationStatus.DOCS_REJECTED;
 
   useEffect(() => {
     setFormData(applicant);
     setESignChecked(applicant.isESigned || false);
-    // Determine PDPA checked state. Assuming if already signed, PDPA was accepted.
     setPdpaChecked(applicant.isESigned || false);
     setSignatureImage(applicant.signatureImage || null);
     setForceEditMode(false);
@@ -134,27 +132,23 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
     setFieldConfigs(getFieldConfigs());
     setDocConfigs(getDocumentConfigs());
     setPaymentConfig(getPaymentConfig());
-    setExamSuites(getExamSuites()); // Fetch dynamic suites
+    setExamSuites(getExamSuites());
     setInterviewSlots(getInterviewSlots());
     setSystemAnnouncements(getAnnouncements());
     
-    // Init other title if needed
     if (applicant.title && !['Mr.', 'Mrs.', 'Miss', 'Dr. (Med)', 'Dr. (PhD)'].includes(applicant.title)) {
         setOtherTitle(applicant.title);
     }
   }, [applicant]);
 
-  // Sync Full Name logic
   useEffect(() => {
       const t = formData.title === 'Other' ? otherTitle : formData.title;
       const full = `${String(t || '')} ${String(formData.firstName || '')} ${String(formData.lastName || '')}`.trim();
       if(full !== formData.fullName) {
-          // Update local state only, don't trigger save yet
           setFormData(prev => ({...prev, fullName: full}));
       }
   }, [formData.title, formData.firstName, formData.lastName, otherTitle]);
 
-  // Ensure at least one payment method is selected if available
   useEffect(() => {
     if (!paymentConfig.kplus && paymentConfig.qrcode && paymentMethod !== 'qrcode') {
         setPaymentMethod('qrcode');
@@ -162,8 +156,6 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
         setPaymentMethod('kplus');
     }
   }, [paymentConfig]);
-
-  // --- Logic Helpers ---
 
   const isProfileComplete = () => {
     const requiredStandardFields = fieldConfigs.filter(f => f.type === 'standard' && f.isRequired && !f.isHidden);
@@ -179,7 +171,6 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
             if (!val || (typeof val === 'string' && !val.trim()) || (typeof val === 'number' && val === 0)) return false;
         }
     }
-
     const requiredCustomFields = fieldConfigs.filter(f => f.type !== 'standard' && f.isRequired && !f.isHidden);
     for (const field of requiredCustomFields) {
         if (field.id === 'recommendations') {
@@ -194,17 +185,12 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
             if (!val || (Array.isArray(val) && val.length === 0) || (typeof val === 'string' && !val.trim())) return false;
         }
     }
-    
     return true;
   };
 
   const isDocsComplete = () => {
-    // Only check REQUIRED docs
     const requiredDocIds = docConfigs.filter(c => c.isRequired && !c.isHidden).map(c => c.id);
-    
-    // Get doc items that correspond to required configs
     const requiredItems = Object.values(formData.documents).filter((d: DocumentItem) => requiredDocIds.includes(d.configId || ''));
-
     return requiredItems.every((d: DocumentItem) => 
       d.status === DocumentStatus.UPLOADED || d.status === DocumentStatus.APPROVED
     );
@@ -213,7 +199,6 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
   const getCompletedQuestionCount = () => {
       const totalQuestions = exams.length;
       if (totalQuestions === 0) return 0;
-      // Count how many questions have answers in formData.examAnswers
       const answeredCount = exams.filter(q => {
          const ans = formData.examAnswers?.[q.id];
          return ans !== undefined && ans !== '' && (Array.isArray(ans) ? ans.length > 0 : true);
@@ -226,212 +211,104 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
     return totalQuestions > 0 && getCompletedQuestionCount() === totalQuestions;
   };
 
-  const canProceedToReview = () => {
-    return isProfileComplete() && isDocsComplete() && isExamComplete();
-  };
+  const canProceedToReview = () => isProfileComplete() && isDocsComplete() && isExamComplete();
 
-  // --- Notification Logic ---
   const getNotifications = () => {
       const notis = [];
-      
-      // Dynamic System Notices from Admin
       systemAnnouncements.forEach(ann => {
-          notis.push({
-              id: ann.id,
-              title: ann.title,
-              message: ann.message,
-              time: new Date(ann.timestamp).toLocaleDateString(),
-              type: ann.type,
-              read: false
-          });
+          notis.push({ id: ann.id, title: ann.title, message: ann.message, time: new Date(ann.timestamp).toLocaleDateString(), type: ann.type, read: false });
       });
-
-      // Status Based Notifications
       if (displayStatus === ApplicationStatus.DOCS_REJECTED) {
-          notis.push({
-              id: 'st_rej',
-              title: 'Action Required',
-              message: 'Your documents have been returned by the staff. Please check the rejection reason and re-upload.',
-              time: 'Just now',
-              type: 'urgent',
-              read: false
-          });
+          notis.push({ id: 'st_rej', title: 'Action Required', message: 'Your documents have been returned by the staff. Please check the rejection reason and re-upload.', time: 'Just now', type: 'urgent', read: false });
       } else if (displayStatus === ApplicationStatus.DOCS_APPROVED) {
-          notis.push({
-              id: 'st_app',
-              title: 'Documents Approved',
-              message: 'Your documents have been verified. You can now proceed to the Interview stage.',
-              time: '1 day ago',
-              type: 'success',
-              read: true
-          });
+          notis.push({ id: 'st_app', title: 'Documents Approved', message: 'Your documents have been verified. You can now proceed to the Interview stage.', time: '1 day ago', type: 'success', read: true });
       } else if (displayStatus === ApplicationStatus.INTERVIEW_READY) {
-           notis.push({
-              id: 'st_int_r',
-              title: 'Ready to Book',
-              message: 'Interview fee received. Please select your preferred interview time slot.',
-              time: '10 mins ago',
-              type: 'success',
-              read: false
-          });
+           notis.push({ id: 'st_int_r', title: 'Ready to Book', message: 'Interview fee received. Please select your preferred interview time slot.', time: '10 mins ago', type: 'success', read: false });
       } else if (displayStatus === ApplicationStatus.PASSED) {
-          notis.push({
-              id: 'st_pass',
-              title: 'Congratulations!',
-              message: 'You have passed the interview! Welcome to UniAdmit. Please proceed to enrollment.',
-              time: 'Recently',
-              type: 'success',
-              read: false
-          });
+          notis.push({ id: 'st_pass', title: 'Congratulations!', message: 'You have passed the interview! Welcome to UniAdmit. Please proceed to enrollment.', time: 'Recently', type: 'success', read: false });
       } else if (displayStatus === ApplicationStatus.FAILED) {
-          notis.push({
-              id: 'st_fail',
-              title: 'Application Update',
-              message: 'We regret to inform you that your application was not successful. View details for more info.',
-              time: 'Recently',
-              type: 'info',
-              read: false
-          });
+          notis.push({ id: 'st_fail', title: 'Application Update', message: 'We regret to inform you that your application was not successful. View details for more info.', time: 'Recently', type: 'info', read: false });
       }
-
       return notis;
   };
 
   const notifications = getNotifications();
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  // --- Education List Management Logic ---
-
   const handleAddEducation = () => {
     if (isEditRestricted) return;
-    
     const selectedConfig = EDUCATION_LEVELS.find(l => l.label === newEduLevel);
     if (!selectedConfig) return;
-
     let currentEdus = [...(formData.educations || [])];
-
-    // Auto-add lower degrees logic
     for (let l = selectedConfig.level; l >= 2; l--) {
         const config = EDUCATION_LEVELS.find(el => el.level === l);
         if (config) {
             const exists = currentEdus.some(e => e.level === config.label);
             if (!exists) {
-                currentEdus.push({
-                    id: `edu_${Date.now()}_${l}`,
-                    level: config.label,
-                    degreeName: '',
-                    institution: '',
-                    gpax: '',
-                    startYear: '',
-                    endYear: ''
-                });
+                currentEdus.push({ id: `edu_${Date.now()}_${l}`, level: config.label, degreeName: '', institution: '', gpax: '', startYear: '', endYear: '' });
             }
         }
     }
-    
     const getLevelVal = (lbl: string) => EDUCATION_LEVELS.find(el => el.label === lbl)?.level || 0;
     currentEdus.sort((a, b) => getLevelVal(a.level) - getLevelVal(b.level)); 
-
     setFormData(prev => ({ ...prev, educations: currentEdus }));
   };
 
   const handleRemoveEducation = (id: string) => {
     if (isEditRestricted) return;
-    setFormData(prev => ({
-        ...prev,
-        educations: prev.educations.filter(e => e.id !== id)
-    }));
+    setFormData(prev => ({ ...prev, educations: prev.educations.filter(e => e.id !== id) }));
   };
 
   const handleEducationUpdate = (id: string, field: keyof EducationRecord, value: string) => {
     if (isEditRestricted) return;
-    setFormData(prev => ({
-        ...prev,
-        educations: prev.educations.map(e => e.id === id ? { ...e, [field]: value } : e)
-    }));
+    setFormData(prev => ({ ...prev, educations: prev.educations.map(e => e.id === id ? { ...e, [field]: value } : e) }));
   };
 
-  // --- Dynamic Document Generation based on Config and Education ---
   useEffect(() => {
       if (displayStatus !== ApplicationStatus.DRAFT && displayStatus !== ApplicationStatus.DOCS_REJECTED) return;
-
       const currentDocs: Record<string, DocumentItem> = { ...formData.documents };
       const educations = formData.educations || [];
       const configs = docConfigs.length > 0 ? docConfigs : []; 
-
       if (configs.length === 0) return; 
-
-      // 1. Sync based on Configs
       configs.forEach(conf => {
           if (conf.isHidden) return;
           if (conf.id === 'doc_conf_edu') return;
-
           const existingDoc = (Object.values(currentDocs) as DocumentItem[]).find(d => d.configId === conf.id);
-          
           if (!existingDoc) {
               const newId = `doc_${conf.id}_${Date.now()}`;
-              currentDocs[newId] = {
-                  id: newId,
-                  name: conf.label,
-                  status: DocumentStatus.PENDING,
-                  configId: conf.id
-              };
+              currentDocs[newId] = { id: newId, name: conf.label, status: DocumentStatus.PENDING, configId: conf.id };
           } else if (existingDoc.name !== conf.label) {
               currentDocs[existingDoc.id].name = conf.label;
           }
       });
-
-      // 2. Handle Education Certificates (Dynamic)
       Object.keys(currentDocs).forEach(key => {
           if (currentDocs[key].isDynamic && currentDocs[key].configId === 'doc_conf_edu') {
               const eduId = key.replace('doc_cert_', '');
-              if (!educations.find(e => e.id === eduId)) {
-                  delete currentDocs[key];
-              }
+              if (!educations.find(e => e.id === eduId)) delete currentDocs[key];
           }
       });
-
       const eduConfig = configs.find(c => c.id === 'doc_conf_edu');
       if (eduConfig && !eduConfig.isHidden) {
           educations.forEach(edu => {
               const docId = `doc_cert_${edu.id}`;
               const docName = `${eduConfig.label} - ${edu.level}${edu.degreeName ? ` (${edu.degreeName})` : ''}`;
-
               if (!currentDocs[docId]) {
-                  currentDocs[docId] = {
-                      id: docId,
-                      name: docName,
-                      status: DocumentStatus.PENDING,
-                      isDynamic: true,
-                      configId: 'doc_conf_edu'
-                  };
+                  currentDocs[docId] = { id: docId, name: docName, status: DocumentStatus.PENDING, isDynamic: true, configId: 'doc_conf_edu' };
               } else if (currentDocs[docId].name !== docName) {
                   currentDocs[docId].name = docName;
               }
           });
       }
-
       if (JSON.stringify(currentDocs) !== JSON.stringify(formData.documents)) {
           setFormData(prev => ({ ...prev, documents: currentDocs }));
       }
   }, [formData.educations, displayStatus, docConfigs]);
 
-
-  // --- Handlers ---
-
   const handleProfileSave = () => {
-    if (!isProfileComplete()) {
-        alert("Please complete all required fields including Recommendations.");
-        return;
-    }
+    if (!isProfileComplete()) { alert("Please complete all required fields including Recommendations."); return; }
     if (!isEditRestricted) {
-        // Prepare title for save if Other
         const finalTitle = formData.title === 'Other' ? otherTitle : formData.title;
-        const updated = { 
-            ...formData, 
-            title: finalTitle,
-            fullName: `${finalTitle || ''} ${formData.firstName || ''} ${formData.lastName || ''}`.trim()
-        };
+        const updated = { ...formData, title: finalTitle, fullName: `${finalTitle || ''} ${formData.firstName || ''} ${formData.lastName || ''}`.trim() };
         saveApplicant(updated);
         onUpdate(updated);
     }
@@ -443,112 +320,61 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
       setFormData({ ...formData, customData: updatedCustomData });
   };
 
-  // ... (Cropping and Upload logic remains same)
-  // Generic file upload
   const handleFileUpload = (docId: string) => {
     const updatedDocs = { ...formData.documents };
     const mockFileName = `${updatedDocs[docId].name.replace(/[^a-zA-Z0-9]/g, '_')}_scanned.pdf`;
-    
-    updatedDocs[docId] = {
-      ...updatedDocs[docId],
-      status: DocumentStatus.UPLOADED,
-      fileUrl: 'mock_url_blob',
-      fileName: mockFileName,
-      reviewNote: undefined 
-    };
+    updatedDocs[docId] = { ...updatedDocs[docId], status: DocumentStatus.UPLOADED, fileUrl: 'mock_url_blob', fileName: mockFileName, reviewNote: undefined };
     const updatedApplicant = { ...formData, documents: updatedDocs };
-    setFormData(updatedApplicant);
-    saveApplicant(updatedApplicant);
-    onUpdate(updatedApplicant);
+    setFormData(updatedApplicant); saveApplicant(updatedApplicant); onUpdate(updatedApplicant);
   };
 
-  // --- Profile Pic Cropping Handlers ---
   const handleProfilePicSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {
           const reader = new FileReader();
-          reader.onload = (ev) => {
-              if (ev.target?.result) {
-                  setOriginalImage(ev.target.result as string);
-                  setCropScale(1);
-                  setCropPos({ x: 0, y: 0 });
-                  setIsCropOpen(true);
-                  e.target.value = '';
-              }
-          };
+          reader.onload = (ev) => { if (ev.target?.result) { setOriginalImage(ev.target.result as string); setCropScale(1); setCropPos({ x: 0, y: 0 }); setIsCropOpen(true); e.target.value = ''; } };
           reader.readAsDataURL(e.target.files[0]);
       }
   };
 
   const handleCropMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
-      e.preventDefault();
-      setIsDraggingCrop(true);
+      e.preventDefault(); setIsDraggingCrop(true);
       const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
       const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
       setDragStart({ x: clientX - cropPos.x, y: clientY - cropPos.y });
   };
 
   const handleCropMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
-      if (!isDraggingCrop) return;
-      e.preventDefault();
+      if (!isDraggingCrop) return; e.preventDefault();
       const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
       const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
-      setCropPos({
-          x: clientX - dragStart.x,
-          y: clientY - dragStart.y
-      });
+      setCropPos({ x: clientX - dragStart.x, y: clientY - dragStart.y });
   };
 
-  const handleCropMouseUp = () => {
-      setIsDraggingCrop(false);
-  };
+  const handleCropMouseUp = () => setIsDraggingCrop(false);
 
   const handleCropSave = () => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       const img = cropImgRef.current;
       const cropSize = 300;
-      canvas.width = cropSize;
-      canvas.height = cropSize;
-
+      canvas.width = cropSize; canvas.height = cropSize;
       if (ctx && img) {
-          const naturalWidth = img.naturalWidth;
-          const naturalHeight = img.naturalHeight;
-          ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(0, 0, cropSize, cropSize);
-          ctx.save();
-          ctx.translate(cropSize/2, cropSize/2);
-          ctx.scale(cropScale, cropScale);
-          ctx.translate(cropPos.x, cropPos.y);
+          const naturalWidth = img.naturalWidth; const naturalHeight = img.naturalHeight;
+          ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, cropSize, cropSize);
+          ctx.save(); ctx.translate(cropSize/2, cropSize/2); ctx.scale(cropScale, cropScale); ctx.translate(cropPos.x, cropPos.y);
           const aspectRatio = naturalWidth / naturalHeight;
           let drawWidth, drawHeight;
-          if (aspectRatio > 1) {
-              drawWidth = cropSize;
-              drawHeight = cropSize / aspectRatio;
-          } else {
-              drawHeight = cropSize;
-              drawWidth = cropSize * aspectRatio;
-          }
-          ctx.drawImage(img, -drawWidth/2, -drawHeight/2, drawWidth, drawHeight);
-          ctx.restore();
+          if (aspectRatio > 1) { drawWidth = cropSize; drawHeight = cropSize / aspectRatio; } else { drawHeight = cropSize; drawWidth = cropSize * aspectRatio; }
+          ctx.drawImage(img, -drawWidth/2, -drawHeight/2, drawWidth, drawHeight); ctx.restore();
           const base64 = canvas.toDataURL('image/jpeg', 0.9);
-          
           const picDoc = (Object.values(formData.documents) as DocumentItem[]).find(d => d.configId === 'doc_conf_pic');
           if (picDoc) {
               const updatedDocs = { ...formData.documents };
-              updatedDocs[picDoc.id] = {
-                  ...updatedDocs[picDoc.id],
-                  status: DocumentStatus.UPLOADED,
-                  fileUrl: base64, // Store base64 directly for preview
-                  fileName: 'profile_pic_cropped.jpg',
-                  reviewNote: undefined 
-              };
+              updatedDocs[picDoc.id] = { ...updatedDocs[picDoc.id], status: DocumentStatus.UPLOADED, fileUrl: base64, fileName: 'profile_pic_cropped.jpg', reviewNote: undefined };
               const updated = { ...formData, documents: updatedDocs };
-              setFormData(updated);
-              saveApplicant(updated);
-              onUpdate(updated);
+              setFormData(updated); saveApplicant(updated); onUpdate(updated);
           }
-          setIsCropOpen(false);
-          setOriginalImage(null);
+          setIsCropOpen(false); setOriginalImage(null);
       }
   };
 
@@ -559,45 +385,27 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
     const currentDoc = updatedDocs[docId];
     const newStatus = isEditRestricted ? DocumentStatus.REJECTED : DocumentStatus.PENDING;
     const newNote = isEditRestricted ? (currentDoc.reviewNote || "Document removed. Please re-upload.") : undefined;
-    updatedDocs[docId] = {
-      ...currentDoc,
-      status: newStatus,
-      fileUrl: undefined, 
-      fileName: undefined, 
-      reviewNote: newNote
-    };
+    updatedDocs[docId] = { ...currentDoc, status: newStatus, fileUrl: undefined, fileName: undefined, reviewNote: newNote };
     const updatedApplicant = { ...formData, documents: updatedDocs };
-    setFormData(updatedApplicant); 
-    saveApplicant(updatedApplicant);
-    onUpdate(updatedApplicant);
+    setFormData(updatedApplicant); saveApplicant(updatedApplicant); onUpdate(updatedApplicant);
   }
 
   const handleDocsNext = () => {
     if (isEditRestricted) {
         const hasRejectedDocs = Object.values(formData.documents).some((d: DocumentItem) => d.status === DocumentStatus.REJECTED);
-        if (hasRejectedDocs) {
-            alert("Please re-upload all rejected documents before proceeding.");
-            return;
-        }
+        if (hasRejectedDocs) { alert("Please re-upload all rejected documents before proceeding."); return; }
         setActiveSubSection('esign');
-    } else {
-        setActiveSubSection('test');
-    }
+    } else { setActiveSubSection('test'); }
   };
 
-  // ... (Exam, Slip, Signature Logic remains mostly same, just checking naming)
   const handleExamAnswerChange = (qId: string, value: string | string[]) => {
       if (isEditRestricted) return; 
       const updatedAnswers = { ...formData.examAnswers, [qId]: value };
       const updatedApplicant = { ...formData, examAnswers: updatedAnswers };
-      setFormData(updatedApplicant);
-      saveApplicant(updatedApplicant); 
+      setFormData(updatedApplicant); saveApplicant(updatedApplicant); 
   };
 
-  const handleSuiteReturn = () => {
-      setSelectedSuiteId(null);
-      onUpdate(formData); // Sync up
-  };
+  const handleSuiteReturn = () => { setSelectedSuiteId(null); onUpdate(formData); };
 
   const calculateSuiteProgress = (suiteId: string) => {
      const questionsInSuite = exams.filter(e => e.suiteId === suiteId);
@@ -612,8 +420,7 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
   const handleSlipUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setSlipFile(file);
-      setSlipPreview(URL.createObjectURL(file));
+      setSlipFile(file); setSlipPreview(URL.createObjectURL(file));
     }
   };
 
@@ -637,15 +444,12 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
           const rect = canvasRef.current.getBoundingClientRect();
           const x = 'touches' in e ? e.touches[0].clientX - rect.left : (e as React.MouseEvent).nativeEvent.offsetX;
           const y = 'touches' in e ? e.touches[0].clientY - rect.top : (e as React.MouseEvent).nativeEvent.offsetY;
-          ctx.lineTo(x, y);
-          ctx.stroke();
+          ctx.lineTo(x, y); ctx.stroke();
       }
   };
 
   const endDrawing = () => {
-      if(isDrawing && canvasRef.current) {
-          setSignatureImage(canvasRef.current.toDataURL());
-      }
+      if(isDrawing && canvasRef.current) setSignatureImage(canvasRef.current.toDataURL());
       setIsDrawing(false);
   };
 
@@ -660,9 +464,7 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
   const handleSignatureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {
           const reader = new FileReader();
-          reader.onload = (ev) => {
-              if(ev.target?.result) setSignatureImage(ev.target.result as string);
-          };
+          reader.onload = (ev) => { if(ev.target?.result) setSignatureImage(ev.target.result as string); };
           reader.readAsDataURL(e.target.files[0]);
       }
   };
@@ -671,146 +473,65 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
       <div className="bg-white border border-gray-200 rounded-xl p-6 max-w-3xl mx-auto shadow-sm w-full">
         <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">{title}</h3>
         {!isEditRestricted && <p className="text-gray-500 mb-6 text-center">Total Amount: <span className="font-bold text-gray-900 text-2xl">{amount.toLocaleString()} THB</span></p>}
-        
         {isEditRestricted ? (
             <div className="text-center p-6 bg-blue-50 rounded-lg border border-blue-100 mb-6">
                 <RefreshCw className="w-10 h-10 text-brand-600 mx-auto mb-2" />
                 <p className="font-bold text-brand-800">Resubmission Mode</p>
-                <p className="text-sm text-brand-600 mt-1">
-                    You are resubmitting your application with corrected documents. <br/>
-                    No additional fee is required at this step.
-                </p>
+                <p className="text-sm text-brand-600 mt-1">You are resubmitting your application with corrected documents. <br/> No additional fee is required at this step.</p>
             </div>
         ) : (
             <div className={`grid gap-4 mb-8 ${paymentConfig.kplus && paymentConfig.qrcode ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
             {paymentConfig.kplus && (
-                <button 
-                onClick={() => setPaymentMethod('kplus')}
-                className={`p-4 border-2 rounded-xl flex items-center justify-center transition-all
-                    ${paymentMethod === 'kplus' ? 'border-green-500 bg-green-50 ring-1 ring-green-500' : 'border-gray-200 bg-white hover:border-green-200'}`}
-                >
-                    <div className="bg-green-100 p-2 rounded-full mr-3">
-                    <Smartphone className="w-6 h-6 text-green-700" />
-                    </div>
-                    <div className="text-left">
-                    <div className="font-bold text-gray-900">K-Plus Application</div>
-                    <div className="text-xs text-gray-500">Auto-redirect to app</div>
-                    </div>
+                <button onClick={() => setPaymentMethod('kplus')} className={`p-4 border-2 rounded-xl flex items-center justify-center transition-all ${paymentMethod === 'kplus' ? 'border-green-500 bg-green-50 ring-1 ring-green-500' : 'border-gray-200 bg-white hover:border-green-200'}`}>
+                    <div className="bg-green-100 p-2 rounded-full mr-3"><Smartphone className="w-6 h-6 text-green-700" /></div>
+                    <div className="text-left"><div className="font-bold text-gray-900">K-Plus Application</div><div className="text-xs text-gray-500">Auto-redirect to app</div></div>
                 </button>
             )}
-
             {paymentConfig.qrcode && (
-                <button 
-                    onClick={() => setPaymentMethod('qrcode')}
-                    className={`p-4 border-2 rounded-xl flex items-center justify-center transition-all
-                    ${paymentMethod === 'qrcode' ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500' : 'border-gray-200 bg-white hover:border-brand-200'}`}
-                >
-                    <div className="bg-brand-100 p-2 rounded-full mr-3">
-                    <QrCode className="w-6 h-6 text-brand-700" />
-                    </div>
-                    <div className="text-left">
-                    <div className="font-bold text-gray-900">QR Code / Transfer</div>
-                    <div className="text-xs text-gray-500">Scan and upload slip</div>
-                    </div>
+                <button onClick={() => setPaymentMethod('qrcode')} className={`p-4 border-2 rounded-xl flex items-center justify-center transition-all ${paymentMethod === 'qrcode' ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500' : 'border-gray-200 bg-white hover:border-green-200'}`}>
+                    <div className="bg-brand-100 p-2 rounded-full mr-3"><QrCode className="w-6 h-6 text-brand-700" /></div>
+                    <div className="text-left"><div className="font-bold text-gray-900">QR Code / Transfer</div><div className="text-xs text-gray-500">Scan and upload slip</div></div>
                 </button>
             )}
             </div>
         )}
-        
         {!isEditRestricted && !paymentConfig.kplus && !paymentConfig.qrcode && (
             <div className="text-center p-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-xl">
-                <AlertCircle className="w-8 h-8 mx-auto mb-2 text-gray-400"/>
-                No payment methods available. Please contact support.
+                <AlertCircle className="w-8 h-8 mx-auto mb-2 text-gray-400"/> No payment methods available. Please contact support.
             </div>
         )}
-
         {!isEditRestricted && paymentMethod === 'kplus' && paymentConfig.kplus && (
             <div className="text-center animate-fade-in">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 mx-auto">
-                <span className="text-2xl font-bold text-green-700">K</span>
-                </div>
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 mx-auto"><span className="text-2xl font-bold text-green-700">K</span></div>
                 <h3 className="text-lg font-bold text-gray-900 mb-2">Pay with K-Plus</h3>
                 <p className="text-sm text-gray-500 mb-6">Click below to open the K-Plus app and complete payment.</p>
-                
-                <Button 
-                size="lg" 
-                className="w-full max-w-xs bg-[#00A950] hover:bg-[#008c42] text-white"
-                onClick={onPay}
-                isLoading={isPayLoading}
-                >
-                {isPayLoading ? 'Processing...' : buttonText || 'Open K-Plus App'}
-                </Button>
+                <Button size="lg" className="w-full max-w-xs bg-[#00A950] hover:bg-[#008c42] text-white" onClick={onPay} isLoading={isPayLoading}>{isPayLoading ? 'Processing...' : buttonText || 'Open K-Plus App'}</Button>
             </div>
         )}
-
         {!isEditRestricted && paymentMethod === 'qrcode' && paymentConfig.qrcode && (
             <div className="space-y-6 animate-fade-in">
                 <div className="flex flex-col md:flex-row gap-8 justify-center items-start">
                     <div className="flex-1 w-full flex flex-col items-center p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="w-40 h-40 bg-white p-2 mb-3 shadow-sm border border-gray-200 flex items-center justify-center">
-                        <QrCode className="w-32 h-32 text-gray-800" />
-                    </div>
+                    <div className="w-40 h-40 bg-white p-2 mb-3 shadow-sm border border-gray-200 flex items-center justify-center"><QrCode className="w-32 h-32 text-gray-800" /></div>
                     <p className="text-xs text-gray-500 mb-2">Scan to Pay</p>
-                    <div className="text-center space-y-1 text-sm">
-                        <p className="font-bold text-gray-900">UniAdmit University</p>
-                        <p className="text-gray-600">Kasikorn Bank</p>
-                        <p className="font-mono bg-white px-2 py-1 border rounded text-gray-800 select-all">123-4-56789-0</p>
+                    <div className="text-center space-y-1 text-sm"><p className="font-bold text-gray-900">UniAdmit University</p><p className="text-gray-600">Kasikorn Bank</p><p className="font-mono bg-white px-2 py-1 border rounded text-gray-800 select-all">123-4-56789-0</p></div>
                     </div>
-                    </div>
-
                     <div className="flex-1 w-full space-y-4">
                     <h4 className="font-bold text-gray-900">Attach Payment Slip</h4>
                     <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition-colors">
                         {slipPreview ? (
-                            <div className="relative">
-                            <img src={slipPreview} alt="Slip Preview" className="max-h-40 mx-auto rounded shadow-sm" />
-                            <button 
-                                onClick={() => {setSlipFile(null); setSlipPreview(null);}}
-                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                            </div>
+                            <div className="relative"><img src={slipPreview} alt="Slip Preview" className="max-h-40 mx-auto rounded shadow-sm" /><button onClick={() => {setSlipFile(null); setSlipPreview(null);}} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"><X className="w-4 h-4" /></button></div>
                         ) : (
-                            <label className="cursor-pointer flex flex-col items-center justify-center h-full">
-                                <ImageIcon className="w-10 h-10 text-gray-400 mb-2" />
-                                <span className="text-sm text-brand-600 font-medium">Upload Payment Slip</span>
-                                <span className="text-xs text-gray-400 mt-1">JPG, PNG only</span>
-                                <input type="file" accept="image/*" className="hidden" onChange={handleSlipUpload} />
-                            </label>
+                            <label className="cursor-pointer flex flex-col items-center justify-center h-full"><ImageIcon className="w-10 h-10 text-gray-400 mb-2" /><span className="text-sm text-brand-600 font-medium">Upload Payment Slip</span><span className="text-xs text-gray-400 mt-1">JPG, PNG only</span><input type="file" accept="image/*" className="hidden" onChange={handleSlipUpload} /></label>
                         )}
                     </div>
-
-                    <Button 
-                        size="lg" 
-                        className="w-full"
-                        onClick={onPay}
-                        isLoading={isPayLoading}
-                        disabled={!slipFile}
-                    >
-                        {isPayLoading ? 'Verifying...' : 'Confirm Payment'}
-                    </Button>
+                    <Button size="lg" className="w-full" onClick={onPay} isLoading={isPayLoading} disabled={!slipFile}>{isPayLoading ? 'Verifying...' : 'Confirm Payment'}</Button>
                     </div>
                 </div>
             </div>
         )}
-
-        {isEditRestricted && (
-             <div className="text-center">
-                 <Button 
-                    size="lg" 
-                    className="w-full max-w-xs"
-                    onClick={onPay}
-                    isLoading={isPayLoading}
-                >
-                    {isPayLoading ? 'Submitting...' : 'Resubmit Application'}
-                </Button>
-             </div>
-        )}
-        
-        <div className="mt-6 pt-4 border-t border-gray-100 text-center text-xs text-gray-400">
-            Secured by K-Bank Payment Gateway
-        </div>
+        {isEditRestricted && <div className="text-center"><Button size="lg" className="w-full max-w-xs" onClick={onPay} isLoading={isPayLoading}>{isPayLoading ? 'Submitting...' : 'Resubmit Application'}</Button></div>}
+        <div className="mt-6 pt-4 border-t border-gray-100 text-center text-xs text-gray-400">Secured by K-Bank Payment Gateway</div>
       </div>
   );
 
@@ -818,60 +539,55 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
     if (!eSignChecked || !signatureImage) return alert("Please sign the application first.");
     if (!pdpaChecked) return alert("Please accept the PDPA consent.");
     if (!isEditRestricted && paymentMethod === 'qrcode' && !slipFile) return alert("Please upload the payment slip.");
-    
     setIsPayLoading(true);
     setTimeout(() => {
       setIsPayLoading(false);
-      let score = 0;
-      exams.forEach(q => { score += 5; });
-      const updated = { 
-          ...formData, 
-          status: ApplicationStatus.SUBMITTED,
-          lastNotifiedStatus: ApplicationStatus.SUBMITTED,
-          examScore: score,
-          isESigned: true,
-          signatureImage: signatureImage,
-          eSignTimestamp: new Date().toISOString(),
-          feeStatuses: { 
-            application: 'PAID' as FeeStatus, 
-            interview: formData.feeStatuses?.interview || 'PENDING' as FeeStatus,
-            tuition: formData.feeStatuses?.tuition || 'PENDING' as FeeStatus
-          }
-      };
-      saveApplicant(updated);
-      onUpdate(updated);
-      if (isEditRestricted) {
-          alert("Application Resubmitted Successfully.");
-          setForceEditMode(false); 
-          setViewStepOverride(null);
-      } else {
-          alert("Payment Successful! Application Submitted.");
-      }
-      setSlipFile(null);
-      setSlipPreview(null);
+      let score = 0; exams.forEach(q => { score += 5; });
+      const updated = { ...formData, status: ApplicationStatus.SUBMITTED, lastNotifiedStatus: ApplicationStatus.SUBMITTED, examScore: score, isESigned: true, signatureImage: signatureImage, eSignTimestamp: new Date().toISOString(), feeStatuses: { application: 'PAID' as FeeStatus, interview: formData.feeStatuses?.interview || 'PENDING' as FeeStatus, tuition: formData.feeStatuses?.tuition || 'PENDING' as FeeStatus } };
+      saveApplicant(updated); onUpdate(updated);
+      if (isEditRestricted) { alert("Application Resubmitted Successfully."); setForceEditMode(false); setViewStepOverride(null); } else { alert("Payment Successful! Application Submitted."); }
+      setSlipFile(null); setSlipPreview(null);
     }, 2000);
   };
 
   const handleInterviewFeePayment = () => {
     if (paymentMethod === 'qrcode' && !slipFile) return alert("Please upload the payment slip.");
+    if (!tempInterviewSlotId) return alert("Invalid slot selection.");
     setIsPayLoading(true);
     setTimeout(() => {
       setIsPayLoading(false);
-      const updated = { 
-          ...formData, 
-          status: ApplicationStatus.INTERVIEW_READY,
-          lastNotifiedStatus: ApplicationStatus.INTERVIEW_READY,
-          feeStatuses: { 
-             application: formData.feeStatuses?.application || 'PENDING' as FeeStatus,
-             interview: 'PAID' as FeeStatus,
-             tuition: formData.feeStatuses?.tuition || 'PENDING' as FeeStatus
-          }
-      };
-      saveApplicant(updated);
-      onUpdate(updated);
-      alert("Interview Fee Paid! You can now select a time slot.");
-      setSlipFile(null);
-      setSlipPreview(null);
+      const slot = interviewSlots.find(s => s.id === tempInterviewSlotId);
+      if (!slot) return;
+      const success = bookInterviewSlot(tempInterviewSlotId, formData.id);
+      if (success) {
+          const updated = { 
+              ...formData, 
+              interviewSlotId: tempInterviewSlotId,
+              interviewSlot: slot.dateTime, 
+              status: ApplicationStatus.INTERVIEW_BOOKED,
+              lastNotifiedStatus: ApplicationStatus.INTERVIEW_BOOKED,
+              customData: { 
+                  ...formData.customData, 
+                  writtenSlotId: tempWrittenSlotId 
+              },
+              feeStatuses: { 
+                 application: formData.feeStatuses?.application || 'PENDING' as FeeStatus,
+                 interview: 'PAID' as FeeStatus,
+                 tuition: formData.feeStatuses?.tuition || 'PENDING' as FeeStatus
+              }
+          };
+          saveApplicant(updated); onUpdate(updated);
+          setInterviewSlots(getInterviewSlots());
+          setTempInterviewSlotId(null);
+          setTempWrittenSlotId(null);
+          setIsSlotConfirmed(false);
+          alert("Payment Successful! Your slots are booked.");
+      } else {
+          alert("One of the slots is no longer available.");
+          setIsSlotConfirmed(false);
+          setInterviewSlots(getInterviewSlots());
+      }
+      setSlipFile(null); setSlipPreview(null);
     }, 2000);
   }
 
@@ -880,736 +596,201 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
     setIsPayLoading(true);
     setTimeout(() => {
       setIsPayLoading(false);
-      const updated = { 
-          ...formData, 
-          status: ApplicationStatus.ENROLLED,
-          lastNotifiedStatus: ApplicationStatus.ENROLLED,
-          feeStatuses: { 
-             application: formData.feeStatuses?.application || 'PENDING' as FeeStatus,
-             interview: formData.feeStatuses?.interview || 'PENDING' as FeeStatus,
-             tuition: 'PAID' as FeeStatus
-          }
-      };
-      saveApplicant(updated);
-      onUpdate(updated);
-      alert("Tuition Fee Paid! Welcome to UniAdmit.");
-      setSlipFile(null);
-      setSlipPreview(null);
+      const updated = { ...formData, feeStatuses: { application: formData.feeStatuses?.application || 'PENDING' as FeeStatus, interview: formData.feeStatuses?.interview || 'PENDING' as FeeStatus, tuition: 'PAID' as FeeStatus } };
+      saveApplicant(updated); onUpdate(updated);
+      alert("Tuition Fee Paid! Your payment is being verified.");
+      setSlipFile(null); setSlipPreview(null);
     }, 2000);
+  };
+
+  const handleConfirmEnrollment = () => {
+      const updated = { ...formData, customData: { ...formData.customData, confirmedEnrollment: true } };
+      saveApplicant(updated); onUpdate(updated);
+  };
+
+  const handleDeclineEnrollment = () => {
+      if (!confirm("Are you sure you want to decline? This action is permanent.")) return;
+      const updated = { ...formData, status: ApplicationStatus.FAILED, lastNotifiedStatus: ApplicationStatus.FAILED, evaluation: { score: 0, comment: 'Applicant declined enrollment offer.' } };
+      saveApplicant(updated); onUpdate(updated);
   };
 
   const handleDownloadReceipt = (feeType: string) => {
       const text = `RECEIPT\n\nFee Type: ${feeType}\nDate: ${new Date().toLocaleString()}\nAmount: Paid\nApplicant: ${applicant.fullName}`;
       const blob = new Blob([text], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Receipt_${feeType}.txt`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const a = document.createElement('a'); a.href = url; a.download = `Receipt_${feeType}.txt`; a.click(); URL.revokeObjectURL(url);
   };
 
-  const handleInterviewBook = (slotId: string) => {
-    const slot = interviewSlots.find(s => s.id === slotId);
-    if (!slot) return;
-    const success = bookInterviewSlot(slotId, formData.id);
-    if (success) {
-        const updated = { 
-          ...formData, 
-          interviewSlotId: slotId,
-          interviewSlot: slot.dateTime, 
-          status: ApplicationStatus.INTERVIEW_BOOKED,
-          lastNotifiedStatus: ApplicationStatus.INTERVIEW_BOOKED
-        };
-        saveApplicant(updated);
-        onUpdate(updated);
-        setInterviewSlots(getInterviewSlots());
+  const isOverlap = (id1: string | null, id2: string | null) => {
+      if (!id1 || !id2) return false;
+      const s1 = interviewSlots.find(s => s.id === id1);
+      const s2 = interviewSlots.find(s => s.id === id2);
+      if (!s1 || !s2) return false;
+      const start1 = new Date(s1.dateTime).getTime();
+      const end1 = new Date(s1.endTime).getTime();
+      const start2 = new Date(s2.dateTime).getTime();
+      const end2 = new Date(s2.endTime).getTime();
+      return (start1 < end2 && start2 < end1);
+  };
+
+  const handleConfirmSlot = () => {
+    if (tempWrittenSlotId && tempInterviewSlotId && !isOverlap(tempWrittenSlotId, tempInterviewSlotId)) {
+        setIsSlotConfirmed(true);
     } else {
-        alert("Slot booking failed. It might be full.");
-        setInterviewSlots(getInterviewSlots());
+        alert("Please select both slots and ensure they do not overlap.");
     }
   };
 
-  const handleFixApplication = () => {
-    setViewStepOverride(1); 
-    setForceEditMode(true);
-    setActiveSubSection('docs'); 
-  };
+  const handleFixApplication = () => { setViewStepOverride(1); setForceEditMode(true); setActiveSubSection('docs'); };
 
   const handleStepClick = (stepId: number) => {
     if (displayStatus === ApplicationStatus.DOCS_REJECTED) {
-        if (stepId === 1) {
-            setViewStepOverride(1);
-            setForceEditMode(true);
-            setActiveSubSection('docs'); 
-            return;
-        }
-        if (stepId === 2) {
-            setViewStepOverride(2);
-            return;
-        }
+        if (stepId === 1) { setViewStepOverride(1); setForceEditMode(true); setActiveSubSection('docs'); return; }
+        if (stepId === 2) { setViewStepOverride(2); return; }
     }
     let nextStatus = ApplicationStatus.DRAFT;
     if (stepId === 2) nextStatus = ApplicationStatus.SUBMITTED;
     if (stepId === 3) nextStatus = ApplicationStatus.DOCS_APPROVED;
     if (stepId === 4) nextStatus = ApplicationStatus.PASSED;
     const updated = { ...formData, status: nextStatus, lastNotifiedStatus: nextStatus };
-    setFormData(updated);
-    saveApplicant(updated);
-    onUpdate(updated);
-    setViewStepOverride(null);
-    setForceEditMode(false);
-    setSlipFile(null);
-    setSlipPreview(null);
+    setFormData(updated); saveApplicant(updated); onUpdate(updated);
+    setViewStepOverride(null); setForceEditMode(false); setSlipFile(null); setSlipPreview(null);
   };
 
-  // ... Demo Control Actions (AutoFill, etc.)
   const demoAutoFill = (e: React.MouseEvent) => {
     e.preventDefault(); 
     let updated = { ...formData };
     if (activeSubSection === 'profile') {
-      updated = {
-        ...updated,
-        title: 'Mr.',
-        firstName: 'Somchai',
-        lastName: 'Jai-dee',
-        fullName: 'Mr. Somchai Jai-dee',
-        age: 18,
-        gender: Gender.MALE,
-        phone: '081-234-5678',
-        educations: [ { id: 'edu_demo_1', level: "Bachelor's Degree", degreeName: "B.Eng", institution: "Chula", gpax: "3.50", fieldOfStudy: 'Engineering', startYear: '2019', endYear: '2023' } ],
-        address: '99/9 Rama 9 Road, Huai Khwang, Bangkok 10310',
-        email: 'somchai.demo@example.com'
-      };
+      updated = { ...updated, title: 'Mr.', firstName: 'Somchai', lastName: 'Jai-dee', fullName: 'Mr. Somchai Jai-dee', age: 18, gender: Gender.MALE, phone: '081-234-5678', educations: [ { id: 'edu_demo_1', level: "Bachelor's Degree", degreeName: "B.Eng", institution: "Chula", gpax: "3.50", fieldOfStudy: 'Engineering', startYear: '2019', endYear: '2023' } ], address: '99/9 Rama 9 Road, Huai Khwang, Bangkok 10310', email: 'somchai.demo@example.com' };
     } else if (activeSubSection === 'docs') {
       const updatedDocs = { ...updated.documents };
-      Object.keys(updatedDocs).forEach(key => {
-        const isRejected = updatedDocs[key].status === DocumentStatus.REJECTED;
-        if (!isEditRestricted || isRejected) {
-          updatedDocs[key] = { ...updatedDocs[key], status: DocumentStatus.UPLOADED, fileUrl: 'mock_url_blob', fileName: `demo_${updatedDocs[key].name.replace(/\s+/g, '_').toLowerCase()}.pdf`, reviewNote: undefined };
-        }
-      });
+      Object.keys(updatedDocs).forEach(key => { const isRejected = updatedDocs[key].status === DocumentStatus.REJECTED; if (!isEditRestricted || isRejected) { updatedDocs[key] = { ...updatedDocs[key], status: DocumentStatus.UPLOADED, fileUrl: 'mock_url_blob', fileName: `demo_${updatedDocs[key].name.replace(/\s+/g, '_').toLowerCase()}.pdf`, reviewNote: undefined }; } });
       updated.documents = updatedDocs;
     } else if (activeSubSection === 'test') {
       const updatedAnswers = { ...updated.examAnswers };
       exams.forEach(q => { if (q.type === QuestionType.MCQ_SINGLE) { updatedAnswers[q.id] = q.options?.[0].id || ''; } else if (q.type === QuestionType.MCQ_MULTI) { updatedAnswers[q.id] = [q.options?.[0].id || '']; } else if (q.type === QuestionType.ESSAY) { updatedAnswers[q.id] = "This is a generated automated answer for the demo."; } });
       updated.examAnswers = updatedAnswers;
     }
-    setFormData(updated);
-    saveApplicant(updated);
-    onUpdate(updated);
+    setFormData(updated); saveApplicant(updated); onUpdate(updated);
   };
 
   const demoResetApplication = (e: React.MouseEvent) => {
     e.preventDefault();
     const cleanDocs = JSON.parse(JSON.stringify(MOCK_DOCS_TEMPLATE));
-    const updated: Applicant = {
-      id: formData.id,
-      fullName: '',
-      title: '',
-      firstName: '',
-      lastName: '',
-      age: 0,
-      gender: Gender.OTHER,
-      email: formData.email,
-      phone: '',
-      address: '',
-      educations: [], 
-      status: ApplicationStatus.DRAFT,
-      lastNotifiedStatus: ApplicationStatus.DRAFT,
-      documents: cleanDocs,
-      examScore: undefined,
-      examAnswers: {}, 
-      interviewSlot: undefined,
-      evaluation: undefined,
-      customData: {},
-      isESigned: false,
-      eSignTimestamp: undefined
-    };
-    setFormData(updated);
-    saveApplicant(updated);
-    onUpdate(updated);
-    setActiveSubSection('profile');
-    setESignChecked(false);
-    setSelectedSuiteId(null);
-    setSlipFile(null);
-    setSlipPreview(null);
-    setForceEditMode(false);
-    setViewStepOverride(null);
-    window.scrollTo(0, 0);
-    alert("Reset.");
+    const updated: Applicant = { id: formData.id, fullName: '', title: '', firstName: '', lastName: '', age: 0, gender: Gender.OTHER, email: formData.email, phone: '', address: '', educations: [], status: ApplicationStatus.DRAFT, lastNotifiedStatus: ApplicationStatus.DRAFT, documents: cleanDocs, examScore: undefined, examAnswers: {}, interviewSlot: undefined, evaluation: undefined, customData: {}, isESigned: false, eSignTimestamp: undefined };
+    setFormData(updated); saveApplicant(updated); onUpdate(updated);
+    setActiveSubSection('profile'); setESignChecked(false); setSelectedSuiteId(null); setSlipFile(null); setSlipPreview(null); setForceEditMode(false); setViewStepOverride(null); window.scrollTo(0, 0); alert("Reset.");
   };
 
-  // ... (Other demo functions are fine)
-  const demoSimulateStaffApproval = () => { const updatedDocs = { ...formData.documents }; Object.keys(updatedDocs).forEach(key => { updatedDocs[key].status = DocumentStatus.APPROVED; }); const updated = { ...formData, documents: updatedDocs, status: ApplicationStatus.DOCS_APPROVED, lastNotifiedStatus: ApplicationStatus.DOCS_APPROVED }; saveApplicant(updated); onUpdate(updated); };
-  const demoSimulateStaffReject = () => { const updatedDocs = { ...formData.documents }; const firstKey = Object.keys(updatedDocs)[0]; updatedDocs[firstKey].status = DocumentStatus.REJECTED; updatedDocs[firstKey].reviewNote = "Image is blurry. Please re-upload."; const updated = { ...formData, documents: updatedDocs, status: ApplicationStatus.DOCS_REJECTED, lastNotifiedStatus: ApplicationStatus.DOCS_REJECTED }; saveApplicant(updated); onUpdate(updated); };
-  const demoFailScreening = () => { const updated = {...formData, status: ApplicationStatus.FAILED, lastNotifiedStatus: ApplicationStatus.FAILED, evaluation: {score: 0, comment: 'Did not meet screening criteria'}}; saveApplicant(updated); onUpdate(updated); };
-  const demoPassInterview = () => { const updated = {...formData, status: ApplicationStatus.PASSED, lastNotifiedStatus: ApplicationStatus.PASSED, evaluation: {score: 9, comment: 'Great personality!'}}; saveApplicant(updated); onUpdate(updated); };
-  const demoFailInterview = () => { const updated = {...formData, status: ApplicationStatus.FAILED, lastNotifiedStatus: ApplicationStatus.FAILED, evaluation: {score: 4, comment: 'Needs improvement.'}}; saveApplicant(updated); onUpdate(updated); };
-  const demoEnroll = () => { const updated = {...formData, status: ApplicationStatus.ENROLLED, lastNotifiedStatus: ApplicationStatus.ENROLLED}; saveApplicant(updated); onUpdate(updated); };
-
-  // Helper to render dynamic fields based on config
   const renderField = (field: FieldConfig) => {
-      // --- Full Name Logic (Standard) ---
       if (field.id === 'fullName') {
           return (
               <div key={field.id} className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-900 mb-1">{field.label}</label>
                   <div className="flex gap-3">
                       <div className="w-1/4">
-                          <select 
-                              className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100"
-                              disabled={isEditRestricted}
-                              value={formData.title || ''}
-                              onChange={(e) => setFormData({...formData, title: e.target.value})}
-                          >
-                              <option value="">Title</option>
-                              {['Mr.', 'Mrs.', 'Miss', 'Dr. (Med)', 'Dr. (PhD)', 'Other'].map(t => <option key={t} value={t}>{t}</option>)}
+                          <select className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100" disabled={isEditRestricted} value={formData.title || ''} onChange={(e) => setFormData({...formData, title: e.target.value})}>
+                              <option value="">Title</option>{['Mr.', 'Mrs.', 'Miss', 'Dr. (Med)', 'Dr. (PhD)', 'Other'].map(t => <option key={t} value={t}>{t}</option>)}
                           </select>
                           {formData.title === 'Other' && (
-                              <input 
-                                  type="text" 
-                                  placeholder="Specify Title" 
-                                  className="w-full mt-2 border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100"
-                                  disabled={isEditRestricted}
-                                  value={otherTitle}
-                                  onChange={(e) => setOtherTitle(e.target.value)}
-                              />
+                              <input type="text" placeholder="Specify Title" className="w-full mt-2 border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100" disabled={isEditRestricted} value={otherTitle} onChange={(e) => setOtherTitle(e.target.value)}/>
                           )}
                       </div>
-                      <div className="flex-1">
-                          <input 
-                              type="text" 
-                              placeholder="First Name"
-                              className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100"
-                              disabled={isEditRestricted}
-                              value={formData.firstName || ''}
-                              onChange={e => setFormData({...formData, firstName: e.target.value})} 
-                          />
-                      </div>
-                      <div className="flex-1">
-                          <input 
-                              type="text" 
-                              placeholder="Last Name"
-                              className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100"
-                              disabled={isEditRestricted}
-                              value={formData.lastName || ''}
-                              onChange={e => setFormData({...formData, lastName: e.target.value})} 
-                          />
-                      </div>
+                      <div className="flex-1"><input type="text" placeholder="First Name" className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500" disabled={isEditRestricted} value={formData.firstName || ''} onChange={e => setFormData({...formData, firstName: e.target.value})} /></div>
+                      <div className="flex-1"><input type="text" placeholder="Last Name" className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500" disabled={isEditRestricted} value={formData.lastName || ''} onChange={e => setFormData({...formData, lastName: e.target.value})} /></div>
                   </div>
               </div>
           );
       }
-
-      // --- Score Field Renderer ---
       if (field.type === 'score') {
           const scoreData = (formData.customData?.[field.id] as {exam: string, score: string, noScore?: boolean} | undefined) || { exam: '', score: '', noScore: false };
           const currentConfig = field.scoreConfig?.find(c => c.exam === scoreData.exam);
           const min = currentConfig?.min ?? field.minScore ?? 0;
           const max = currentConfig?.max ?? field.maxScore ?? 100;
           const isError = !scoreData.noScore && scoreData.score && (parseFloat(scoreData.score) < min || parseFloat(scoreData.score) > max);
-
           return (
               <div key={field.id} className="md:col-span-2">
                    <label className="block text-sm font-medium text-gray-900 mb-1">{field.label}</label>
                    {field.description && <p className="text-xs text-gray-500 mb-2">{field.description}</p>}
-                   
                    {field.allowNoScore && (
-                       <div className="flex items-center mb-3">
-                            <input 
-                                type="checkbox" 
-                                id={`noScore-${field.id}`}
-                                className="w-4 h-4 text-brand-600 focus:ring-brand-500 border-gray-300 rounded mr-2 bg-white"
-                                checked={scoreData.noScore || false}
-                                onChange={(e) => handleCustomDataChange(field.id, { ...scoreData, noScore: e.target.checked, score: e.target.checked ? '' : scoreData.score, exam: e.target.checked ? '' : scoreData.exam })}
-                                disabled={isEditRestricted}
-                            />
-                            <label htmlFor={`noScore-${field.id}`} className="text-sm text-gray-700 cursor-pointer">I don't have an English score yet</label>
-                       </div>
+                       <div className="flex items-center mb-3"><input type="checkbox" id={`noScore-${field.id}`} className="w-4 h-4 text-brand-600 focus:ring-brand-500 border-gray-300 rounded mr-2 bg-white" checked={scoreData.noScore || false} onChange={(e) => handleCustomDataChange(field.id, { ...scoreData, noScore: e.target.checked, score: e.target.checked ? '' : scoreData.score, exam: e.target.checked ? '' : scoreData.exam })} disabled={isEditRestricted}/><label htmlFor={`noScore-${field.id}`} className="text-sm text-gray-700 cursor-pointer">I don't have an English score yet</label></div>
                    )}
-
                    <div className="flex gap-4">
-                       <select 
-                           className="w-1/2 border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
-                           disabled={isEditRestricted || scoreData.noScore}
-                           value={scoreData.exam}
-                           onChange={e => handleCustomDataChange(field.id, { ...scoreData, exam: e.target.value })}
-                       >
-                           <option value="">Select Exam</option>
-                           {field.scoreConfig ? 
-                                field.scoreConfig.map(c => <option key={c.exam} value={c.exam}>{c.exam}</option>) :
-                                field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)
-                           }
-                       </select>
-                       <div className="w-1/2">
-                            <input 
-                                type="number"
-                                step="0.01" 
-                                placeholder={scoreData.noScore ? "Not required" : `Score (${min}-${max})`}
-                                className={`w-full border rounded-md p-2.5 focus:outline-none focus:ring-1 shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500
-                                    ${isError ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-brand-600 focus:border-brand-600'}
-                                    ${!scoreData.noScore && !isEditRestricted ? 'bg-white' : ''}`}
-                                disabled={isEditRestricted || scoreData.noScore}
-                                value={scoreData.score}
-                                onChange={e => handleCustomDataChange(field.id, { ...scoreData, score: e.target.value })}
-                            />
-                            {isError && <p className="text-xs text-red-600 mt-1">Score must be between {min} and {max}.</p>}
-                       </div>
+                       <select className="w-1/2 border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500" disabled={isEditRestricted || scoreData.noScore} value={scoreData.exam} onChange={e => handleCustomDataChange(field.id, { ...scoreData, exam: e.target.value })}><option value="">Select Exam</option>{field.scoreConfig ? field.scoreConfig.map(c => <option key={c.exam} value={c.exam}>{c.exam}</option>) : field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select>
+                       <div className="w-1/2"><input type="number" step="0.01" placeholder={scoreData.noScore ? "Not required" : `Score (${min}-${max})`} className={`w-full border rounded-md p-2.5 focus:outline-none focus:ring-1 shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500 ${isError ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-brand-600 focus:border-brand-600'} ${!scoreData.noScore && !isEditRestricted ? 'bg-white' : ''}`} disabled={isEditRestricted || scoreData.noScore} value={scoreData.score} onChange={e => handleCustomDataChange(field.id, { ...scoreData, score: e.target.value })}/>{isError && <p className="text-xs text-red-600 mt-1">Score must be between {min} and {max}.</p>}</div>
                    </div>
               </div>
           );
       }
-
-      // --- Letter of Recommendation Renderer ---
       if (field.id === 'recommendations') {
           const recCount = field.itemCount || 3;
           const currentRecs = (formData.customData?.recommendations as Recommender[]) || [];
-          
           return (
               <div key={field.id} className="md:col-span-2 bg-gray-50 p-6 rounded-xl border border-gray-200 shadow-sm">
                   <label className="block text-lg font-bold text-gray-900 mb-2">{field.label}</label>
                   {field.description && <p className="text-sm text-gray-500 mb-4">{field.description}</p>}
-                  
                   <div className="space-y-6">
                       {Array.from({ length: recCount }).map((_, idx) => {
                           const rec = currentRecs[idx] || { name: '', email: '', company: '', relation: '' };
-                          const updateRec = (key: keyof Recommender, val: string) => {
-                              const newRecs = [...currentRecs];
-                              if (!newRecs[idx]) newRecs[idx] = { name: '', email: '', company: '', relation: '' };
-                              newRecs[idx] = { ...newRecs[idx], [key]: val };
-                              handleCustomDataChange('recommendations', newRecs);
-                          };
-
+                          const updateRec = (key: keyof Recommender, val: string) => { const newRecs = [...currentRecs]; if (!newRecs[idx]) newRecs[idx] = { name: '', email: '', company: '', relation: '' }; newRecs[idx] = { ...newRecs[idx], [key]: val }; handleCustomDataChange('recommendations', newRecs); };
                           return (
-                              <div key={idx} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                                  <h4 className="text-sm font-bold text-brand-700 mb-3 uppercase tracking-wider">Recommender {idx + 1}</h4>
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                      <div>
-                                          <label className="block text-xs font-medium text-gray-500 mb-1">Full Name</label>
-                                          <input 
-                                              type="text" 
-                                              className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-brand-600 bg-white"
-                                              disabled={isEditRestricted}
-                                              value={rec.name}
-                                              onChange={(e) => updateRec('name', e.target.value)}
-                                          />
-                                      </div>
-                                      <div>
-                                          <label className="block text-xs font-medium text-gray-500 mb-1">Email Address</label>
-                                          <input 
-                                              type="email" 
-                                              className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-brand-600 bg-white"
-                                              disabled={isEditRestricted}
-                                              value={rec.email}
-                                              onChange={(e) => updateRec('email', e.target.value)}
-                                          />
-                                      </div>
-                                      <div>
-                                          <label className="block text-xs font-medium text-gray-500 mb-1">Company / Institute</label>
-                                          <input 
-                                              type="text" 
-                                              className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-brand-600 bg-white"
-                                              disabled={isEditRestricted}
-                                              value={rec.company}
-                                              onChange={(e) => updateRec('company', e.target.value)}
-                                          />
-                                      </div>
-                                      <div>
-                                          <label className="block text-xs font-medium text-gray-500 mb-1">Relation to Applicant</label>
-                                          <input 
-                                              type="text" 
-                                              className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-brand-600 bg-white"
-                                              disabled={isEditRestricted}
-                                              value={rec.relation}
-                                              onChange={(e) => updateRec('relation', e.target.value)}
-                                          />
-                                      </div>
-                                  </div>
-                              </div>
+                              <div key={idx} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm"><h4 className="text-sm font-bold text-brand-700 mb-3 uppercase tracking-wider">Recommender {idx + 1}</h4><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div><label className="block text-xs font-medium text-gray-500 mb-1">Full Name</label><input type="text" className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-brand-600 bg-white" disabled={isEditRestricted} value={rec.name} onChange={(e) => updateRec('name', e.target.value)}/></div><div><label className="block text-xs font-medium text-gray-500 mb-1">Email Address</label><input type="email" className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-brand-600 bg-white" disabled={isEditRestricted} value={rec.email} onChange={(e) => updateRec('email', e.target.value)}/></div><div><label className="block text-xs font-medium text-gray-500 mb-1">Company / Institute</label><input type="text" className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-brand-600 bg-white" disabled={isEditRestricted} value={rec.company} onChange={(e) => updateRec('company', e.target.value)}/></div><div><label className="block text-xs font-medium text-gray-500 mb-1">Relation to Applicant</label><input type="text" className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-brand-600 bg-white" disabled={isEditRestricted} value={rec.relation} onChange={(e) => updateRec('relation', e.target.value)}/></div></div></div>
                           );
                       })}
                   </div>
-                  {isEditRestricted && formData.fieldRejections?.['recommendations'] && (
-                      <p className="text-sm text-red-600 mt-2 font-bold bg-red-50 p-2 rounded border border-red-100">
-                          Correction Required: {formData.fieldRejections['recommendations']}
-                      </p>
-                  )}
+                  {isEditRestricted && formData.fieldRejections?.['recommendations'] && (<p className="text-sm text-red-600 mt-2 font-bold bg-red-50 p-2 rounded border border-red-100">Correction Required: {formData.fieldRejections['recommendations']}</p>)}
               </div>
           );
       }
-
-      if (field.id === 'age') {
-          return (
-              <div key={field.id}>
-                  <label className="block text-sm font-medium text-gray-900 mb-1">{field.label}</label>
-                  <input type="number" disabled={true} className="w-full border border-gray-300 rounded-md p-2.5 bg-gray-100 text-gray-500 cursor-not-allowed"
-                    value={formData.age || ''} />
-              </div>
-          );
-      }
-      if (field.id === 'birthDate') {
-          return (
-              <div key={field.id}>
-                  <label className="block text-sm font-medium text-gray-900 mb-1">{field.label}</label>
-                  <input 
-                    type="date" 
-                    disabled={isEditRestricted} 
-                    className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
-                    value={formData.birthDate || ''} 
-                    onChange={e => {
-                        const dob = new Date(e.target.value);
-                        const age = new Date().getFullYear() - dob.getFullYear();
-                        setFormData({...formData, birthDate: e.target.value, age: age});
-                    }} 
-                  />
-              </div>
-          );
-      }
-      if (field.id === 'phone') {
-          return (
-              <div key={field.id}>
-                  <label className="block text-sm font-medium text-gray-900 mb-1">{field.label}</label>
-                  <input type="text" disabled={isEditRestricted} className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
-                    value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
-              </div>
-          );
-      }
-      if (field.id === 'email') {
-          return (
-              <div key={field.id}>
-                  <label className="block text-sm font-medium text-gray-900 mb-1">{field.label}</label>
-                  <input type="email" disabled={isEditRestricted} className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
-                    value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
-              </div>
-          );
-      }
-      if (field.id === 'gender') {
-          return (
-              <div key={field.id}>
-                <label className="block text-sm font-medium text-gray-900 mb-1">{field.label}</label>
-                <select disabled={isEditRestricted} className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
-                  value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value as Gender})}
-                >
-                  <option value={Gender.OTHER}>Other</option>
-                  <option value={Gender.MALE}>Male</option>
-                  <option value={Gender.FEMALE}>Female</option>
-                </select>
-              </div>
-          );
-      }
-      if (field.id === 'address') {
-          return (
-              <div key={field.id} className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-900 mb-1">{field.label}</label>
-                <textarea disabled={isEditRestricted} className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500" rows={3}
-                  value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
-              </div>
-          );
-      }
+      if (field.id === 'age') { return (<div key={field.id}><label className="block text-sm font-medium text-gray-900 mb-1">{field.label}</label><input type="number" disabled={true} className="w-full border border-gray-300 rounded-md p-2.5 bg-gray-100 text-gray-500 cursor-not-allowed" value={formData.age || ''} /></div>); }
+      if (field.id === 'birthDate') { return (<div key={field.id}><label className="block text-sm font-medium text-gray-900 mb-1">{field.label}</label><input type="date" disabled={isEditRestricted} className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500" value={formData.birthDate || ''} onChange={e => { const dob = new Date(e.target.value); const age = new Date().getFullYear() - dob.getFullYear(); setFormData({...formData, birthDate: e.target.value, age: age}); }} /></div>); }
+      if (field.id === 'phone') { return (<div key={field.id}><label className="block text-sm font-medium text-gray-900 mb-1">{field.label}</label><input type="text" disabled={isEditRestricted} className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>); }
+      if (field.id === 'email') { return (<div key={field.id}><label className="block text-sm font-medium text-gray-900 mb-1">{field.label}</label><input type="email" disabled={isEditRestricted} className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>); }
+      if (field.id === 'gender') { return (<div key={field.id}><label className="block text-sm font-medium text-gray-900 mb-1">{field.label}</label><select disabled={isEditRestricted} className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500" value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value as Gender})}><option value={Gender.OTHER}>Other</option><option value={Gender.MALE}>Male</option><option value={Gender.FEMALE}>Female</option></select></div>); }
+      if (field.id === 'address') { return (<div key={field.id} className="md:col-span-2"><label className="block text-sm font-medium text-gray-900 mb-1">{field.label}</label><textarea disabled={isEditRestricted} className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500" rows={3} value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} /></div>); }
       if (field.id === 'educations') {
           return (
-              <div key={field.id} className="md:col-span-2 bg-gray-50 p-6 rounded-xl border border-gray-200 shadow-sm">
-                <div className="flex justify-between items-center mb-6">
-                  <label className="block text-lg font-bold text-gray-900">{field.label}</label>
-                </div>
-
-                <div className="bg-white p-3 rounded-lg border border-gray-200 mb-6 flex flex-col md:flex-row gap-3 items-end shadow-sm">
-                    <div className="flex-1 w-full">
-                        <label className="block text-sm font-medium text-gray-900 mb-1">Select Degree Level</label>
-                        <select 
-                            className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
-                            disabled={isEditRestricted}
-                            value={newEduLevel}
-                            onChange={(e) => setNewEduLevel(e.target.value)}
-                        >
-                            {EDUCATION_LEVELS.filter(l => l.level >= 2).map(lvl => <option key={lvl.id} value={lvl.label}>{lvl.label}</option>)}
-                        </select>
-                    </div>
-                    <Button onClick={handleAddEducation} disabled={isEditRestricted} className="w-full md:w-auto flex items-center justify-center">
-                        <Plus className="w-4 h-4 mr-2"/> Add Degree
-                    </Button>
-                </div>
-
-                <div className="space-y-4">
-                    {(!formData.educations || formData.educations.length === 0) && (
-                        <div className="text-center py-8 bg-white rounded-lg border-2 border-dashed border-gray-200 text-gray-400">
-                            <GraduationCap className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                            <p className="text-sm">No degrees added yet.</p>
-                            <p className="text-xs">Please select a degree level above to add your education history.</p>
-                        </div>
-                    )}
-                    {formData.educations?.map((edu, index) => (
-                        <div key={edu.id} className="relative bg-white p-5 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow group">
-                            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button 
-                                    onClick={() => handleRemoveEducation(edu.id)}
-                                    disabled={isEditRestricted}
-                                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
-                                    title="Remove Degree"
-                                >
-                                    <Trash2 className="w-5 h-5" />
-                                </button>
-                            </div>
-
-                            <div className="mb-4">
-                                <span className="inline-block px-3 py-1 bg-brand-50 text-brand-700 text-xs font-bold uppercase tracking-wider rounded-full border border-brand-100">
-                                    {edu.level}
-                                </span>
-                            </div>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-900 mb-1">
-                                      Degree Name <span className="text-red-500">*</span>
-                                    </label>
-                                    <input 
-                                        type="text" 
-                                        placeholder="e.g. Bachelor of Engineering in Computer Engineering"
-                                        className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
-                                        disabled={isEditRestricted}
-                                        value={edu.degreeName || ''}
-                                        onChange={(e) => handleEducationUpdate(edu.id, 'degreeName', e.target.value)}
-                                    />
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-900 mb-1">
-                                      Field of Study <span className="text-red-500">*</span>
-                                    </label>
-                                    <input 
-                                        type="text" 
-                                        placeholder="e.g. Computer Engineering"
-                                        className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
-                                        disabled={isEditRestricted}
-                                        value={edu.fieldOfStudy || ''}
-                                        onChange={(e) => handleEducationUpdate(edu.id, 'fieldOfStudy', e.target.value)}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-900 mb-1">
-                                      Institution <span className="text-red-500">*</span>
-                                    </label>
-                                    <input 
-                                        type="text" 
-                                        placeholder="e.g. Chulalongkorn University"
-                                        className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
-                                        disabled={isEditRestricted}
-                                        value={edu.institution || ''}
-                                        onChange={(e) => handleEducationUpdate(edu.id, 'institution', e.target.value)}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-900 mb-1">
-                                      GPAX <span className="text-red-500">*</span>
-                                    </label>
-                                    <input 
-                                        type="text" 
-                                        placeholder="e.g. 3.50"
-                                        className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
-                                        disabled={isEditRestricted}
-                                        value={edu.gpax}
-                                        onChange={(e) => handleEducationUpdate(edu.id, 'gpax', e.target.value)}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-900 mb-1">Start Year</label>
-                                    <input 
-                                        type="text" 
-                                        placeholder="YYYY"
-                                        className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
-                                        disabled={isEditRestricted}
-                                        value={edu.startYear || ''}
-                                        onChange={(e) => handleEducationUpdate(edu.id, 'startYear', e.target.value)}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-900 mb-1">End Year</label>
-                                    <input 
-                                        type="text" 
-                                        placeholder="YYYY"
-                                        className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
-                                        disabled={isEditRestricted}
-                                        value={edu.endYear || ''}
-                                        onChange={(e) => handleEducationUpdate(edu.id, 'endYear', e.target.value)}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-              </div>
+              <div key={field.id} className="md:col-span-2 bg-gray-50 p-6 rounded-xl border border-gray-200 shadow-sm"><div className="flex justify-between items-center mb-6"><label className="block text-lg font-bold text-gray-900">{field.label}</label></div><div className="bg-white p-3 rounded-lg border border-gray-200 mb-6 flex flex-col md:flex-row gap-3 items-end shadow-sm"><div className="flex-1 w-full"><label className="block text-sm font-medium text-gray-900 mb-1">Select Degree Level</label><select className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500" disabled={isEditRestricted} value={newEduLevel} onChange={(e) => setNewEduLevel(e.target.value)}>{EDUCATION_LEVELS.filter(l => l.level >= 2).map(lvl => <option key={lvl.id} value={lvl.label}>{lvl.label}</option>)}</select></div><Button onClick={handleAddEducation} disabled={isEditRestricted} className="w-full md:w-auto flex items-center justify-center"><Plus className="w-4 h-4 mr-2"/> Add Degree</Button></div><div className="space-y-4">{(!formData.educations || formData.educations.length === 0) && (<div className="text-center py-8 bg-white rounded-lg border-2 border-dashed border-gray-200 text-gray-400"><GraduationCap className="w-10 h-10 mx-auto mb-2 opacity-50" /><p className="text-sm">No degrees added yet.</p><p className="text-xs">Please select a degree level above to add your education history.</p></div>)}{formData.educations?.map((edu, index) => (<div key={edu.id} className="relative bg-white p-5 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow group"><div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => handleRemoveEducation(edu.id)} disabled={isEditRestricted} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors" title="Remove Degree"><Trash2 className="w-5 h-5" /></button></div><div className="mb-4"><span className="inline-block px-3 py-1 bg-brand-50 text-brand-700 text-xs font-bold uppercase tracking-wider rounded-full border border-brand-100">{edu.level}</span></div><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div className="md:col-span-2"><label className="block text-sm font-medium text-gray-900 mb-1">Degree Name <span className="text-red-500">*</span></label><input type="text" placeholder="e.g. Bachelor of Engineering in Computer Engineering" className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500" disabled={isEditRestricted} value={edu.degreeName || ''} onChange={(e) => handleEducationUpdate(edu.id, 'degreeName', e.target.value)}/></div><div className="md:col-span-2"><label className="block text-sm font-medium text-gray-900 mb-1">Field of Study <span className="text-red-500">*</span></label><input type="text" placeholder="e.g. Computer Engineering" className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500" disabled={isEditRestricted} value={edu.fieldOfStudy || ''} onChange={(e) => handleEducationUpdate(edu.id, 'fieldOfStudy', e.target.value)}/></div><div><label className="block text-sm font-medium text-gray-900 mb-1">Institution <span className="text-red-500">*</span></label><input type="text" placeholder="e.g. Chulalongkorn University" className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500" disabled={isEditRestricted} value={edu.institution || ''} onChange={(e) => handleEducationUpdate(edu.id, 'institution', e.target.value)}/></div><div><label className="block text-sm font-medium text-gray-900 mb-1">GPAX <span className="text-red-500">*</span></label><input type="text" placeholder="e.g. 3.50" className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500" disabled={isEditRestricted} value={edu.gpax} onChange={(e) => handleEducationUpdate(edu.id, 'gpax', e.target.value)}/></div><div><label className="block text-sm font-medium text-gray-900 mb-1">Start Year</label><input type="text" placeholder="YYYY" className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500" disabled={isEditRestricted} value={edu.startYear || ''} onChange={(e) => handleEducationUpdate(edu.id, 'startYear', e.target.value)}/></div><div><label className="block text-sm font-medium text-gray-900 mb-1">End Year</label><input type="text" placeholder="YYYY" className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500" disabled={isEditRestricted} value={edu.endYear || ''} onChange={(e) => handleEducationUpdate(edu.id, 'endYear', e.target.value)}/></div></div></div>))}</div></div>
           );
       }
-
-      // Render Custom Fields (merged into the same layout)
       return (
           <div key={field.id} className={field.type === 'checkbox' || field.type === 'radio' ? 'md:col-span-2' : ''}>
               <label className="block text-sm font-medium text-gray-900 mb-1">{field.label}</label>
               {field.description && <p className="text-xs text-gray-500 mb-2">{field.description}</p>}
-              
-              {field.type === 'text' && (
-                  <input 
-                      type="text" 
-                      className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
-                      disabled={isEditRestricted}
-                      value={formData.customData?.[field.id] || ''}
-                      onChange={e => handleCustomDataChange(field.id, e.target.value)}
-                  />
-              )}
-
-              {field.type === 'dropdown' && (
-                  <select 
-                      className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
-                      disabled={isEditRestricted}
-                      value={formData.customData?.[field.id] || ''}
-                      onChange={e => handleCustomDataChange(field.id, e.target.value)}
-                  >
-                      <option value="">Select {field.label}</option>
-                      {field.options?.map(opt => (
-                          <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                  </select>
-              )}
-
-              {/* Boxed Radio & Checkbox */}
+              {field.type === 'text' && (<input type="text" className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500" disabled={isEditRestricted} value={formData.customData?.[field.id] || ''} onChange={e => handleCustomDataChange(field.id, e.target.value)}/>)}
+              {field.type === 'dropdown' && (<select className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500" disabled={isEditRestricted} value={formData.customData?.[field.id] || ''} onChange={e => handleCustomDataChange(field.id, e.target.value)}><option value="">Select {field.label}</option>{field.options?.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select>)}
               {(field.type === 'radio' || field.type === 'checkbox') && (
                   <div className="border border-gray-200 rounded-lg p-4 bg-gray-50/50">
-                      {field.type === 'radio' && field.options && (
-                          <div className="space-y-2">
-                              {field.options.map(opt => (
-                                  <label key={opt} className="flex items-center space-x-2 cursor-pointer bg-white p-2 rounded border border-gray-100 hover:border-brand-200 transition-colors">
-                                      <input 
-                                          type="radio" 
-                                          name={`radio-${field.id}`}
-                                          className="form-radio h-4 w-4 text-brand-600 focus:ring-brand-500 border-gray-300 bg-white"
-                                          disabled={isEditRestricted}
-                                          checked={formData.customData?.[field.id] === opt}
-                                          onChange={() => handleCustomDataChange(field.id, opt)}
-                                      />
-                                      <span className="text-gray-700 text-sm font-medium">{opt}</span>
-                                  </label>
-                              ))}
-                          </div>
-                      )}
-
-                      {field.type === 'checkbox' && (
-                          <div className="space-y-2">
-                             {field.options && field.options.length > 0 ? (
-                                /* Multi-select Checkbox Group */
-                                 <>
-                                     {field.options.map(opt => {
-                                         const currentVals = (formData.customData?.[field.id] as string[]) || [];
-                                         const isChecked = currentVals.includes(opt);
-                                         return (
-                                             <label key={opt} className="flex items-center space-x-2 cursor-pointer bg-white p-2 rounded border border-gray-100 hover:border-brand-200 transition-colors">
-                                                 <input 
-                                                     type="checkbox" 
-                                                     className="form-checkbox h-4 w-4 text-brand-600 focus:ring-brand-500 border-gray-300 rounded bg-white"
-                                                     disabled={isEditRestricted}
-                                                     checked={isChecked}
-                                                     onChange={(e) => {
-                                                         let newVals = [...currentVals];
-                                                         if (e.target.checked) newVals.push(opt);
-                                                         else newVals = newVals.filter(v => v !== opt);
-                                                         handleCustomDataChange(field.id, newVals);
-                                                     }}
-                                                 />
-                                                 <span className="text-gray-700 text-sm font-medium">{opt}</span>
-                                             </label>
-                                         );
-                                     })}
-                                 </>
-                             ) : (
-                                /* Single Boolean Checkbox */
-                                 <label className="flex items-center space-x-2 cursor-pointer bg-white p-2 rounded border border-gray-100 hover:border-brand-200 transition-colors">
-                                      <input 
-                                          type="checkbox" 
-                                          className="form-checkbox h-4 w-4 text-brand-600 focus:ring-brand-500 border-gray-300 rounded bg-white"
-                                          disabled={isEditRestricted}
-                                          checked={!!formData.customData?.[field.id]}
-                                          onChange={e => handleCustomDataChange(field.id, e.target.checked)}
-                                      />
-                                      <span className="text-gray-700 text-sm font-medium">Yes / Enabled</span>
-                                  </label>
-                             )}
-                          </div>
-                      )}
+                      {field.type === 'radio' && field.options && (<div className="space-y-2">{field.options.map(opt => (<label key={opt} className="flex items-center space-x-2 cursor-pointer bg-white p-2 rounded border border-gray-100 hover:border-brand-200 transition-colors"><input type="radio" name={`radio-${field.id}`} className="form-radio h-4 w-4 text-brand-600 focus:ring-brand-500 border-gray-300 bg-white" disabled={isEditRestricted} checked={formData.customData?.[field.id] === opt} onChange={() => handleCustomDataChange(field.id, opt)}/><span className="text-gray-700 text-sm font-medium">{opt}</span></label>))}</div>)}
+                      {field.type === 'checkbox' && (<div className="space-y-2">{field.options && field.options.length > 0 ? (<>{field.options.map(opt => { const currentVals = (formData.customData?.[field.id] as string[]) || []; const isChecked = currentVals.includes(opt); return (<label key={opt} className="flex items-center space-x-2 cursor-pointer bg-white p-2 rounded border border-gray-100 hover:border-brand-200 transition-colors"><input type="checkbox" className="form-checkbox h-4 w-4 text-brand-600 focus:ring-brand-500 border-gray-300 rounded bg-white" disabled={isEditRestricted} checked={isChecked} onChange={(e) => { let newVals = [...currentVals]; if (e.target.checked) newVals.push(opt); else newVals = newVals.filter(v => v !== opt); handleCustomDataChange(field.id, newVals); }}/><span className="text-gray-700 text-sm font-medium">{opt}</span></label>); })}</>) : (<label className="flex items-center space-x-2 cursor-pointer bg-white p-2 rounded border border-gray-100 hover:border-brand-200 transition-colors"><input type="checkbox" className="form-checkbox h-4 w-4 text-brand-600 focus:ring-brand-500 border-gray-300 rounded bg-white" disabled={isEditRestricted} checked={!!formData.customData?.[field.id]} onChange={e => handleCustomDataChange(field.id, e.target.checked)}/><span className="text-gray-700 text-sm font-medium">Yes / Enabled</span></label>)}</div>)}
                   </div>
               )}
           </div>
       );
   };
 
-  // Helper for read-only view
   const renderReadOnlyField = (field: FieldConfig) => {
-      // Logic to display value nicely
       let val = null;
       if (field.id === 'recommendations') {
           const recs = (formData.customData?.recommendations as Recommender[]) || [];
           if (recs.length === 0) return <span className="text-gray-400 italic">No recommendations provided</span>;
-          return (
-              <div key={field.id} className="md:col-span-2 bg-gray-50 p-4 rounded-lg">
-                  <span className="block text-xs font-bold text-gray-500 uppercase mb-3 border-b border-gray-200 pb-1">{field.label}</span>
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                      {recs.map((rec, idx) => (
-                          <div key={idx} className="bg-white p-3 rounded border border-gray-200 shadow-sm text-sm">
-                              <div className="font-bold text-brand-700 mb-1">{rec.name}</div>
-                              <div className="text-gray-600 flex flex-col gap-1">
-                                  <span className="flex items-center gap-1"><Mail className="w-3 h-3"/> {rec.email}</span>
-                                  <span className="flex items-center gap-1"><User className="w-3 h-3"/> {rec.relation}</span>
-                                  <span className="flex items-center gap-1"><Award className="w-3 h-3"/> {rec.company}</span>
-                              </div>
-                          </div>
-                      ))}
-                  </div>
-              </div>
-          );
+          return (<div key={field.id} className="md:col-span-2 bg-gray-50 p-4 rounded-lg"><span className="block text-xs font-bold text-gray-500 uppercase mb-3 border-b border-gray-200 pb-1">{field.label}</span><div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">{recs.map((rec, idx) => (<div key={idx} className="bg-white p-3 rounded border border-gray-200 shadow-sm text-sm"><div className="font-bold text-brand-700 mb-1">{rec.name}</div><div className="text-gray-600 flex flex-col gap-1"><span className="flex items-center gap-1"><Mail className="w-3 h-3"/> {rec.email}</span><span className="flex items-center gap-1"><User className="w-3 h-3"/> {rec.relation}</span><span className="flex items-center gap-1"><Award className="w-3 h-3"/> {rec.company}</span></div></div>))}</div></div>);
       }
-
       if (field.type === 'standard') {
           if (field.id === 'educations') {
               if (!formData.educations || formData.educations.length === 0) return <span className="text-gray-400 italic">No records</span>;
-              return (
-                  <div className="space-y-2">
-                      {formData.educations.map((edu, i) => (
-                          <div key={i} className="text-sm border-l-2 border-brand-200 pl-3">
-                              <div className="font-bold text-gray-900">{edu.level}</div>
-                              <div className="text-gray-600">{edu.degreeName} {edu.institution ? `@ ${edu.institution}` : ''}</div>
-                              {edu.fieldOfStudy && <div className="text-gray-600 italic">Major: {edu.fieldOfStudy}</div>}
-                              <div className="text-xs text-gray-500">GPAX: {edu.gpax} | {edu.startYear}-{edu.endYear}</div>
-                          </div>
-                      ))}
-                  </div>
-              );
+              return (<div className="space-y-2">{formData.educations.map((edu, i) => (<div key={i} className="text-sm border-l-2 border-brand-200 pl-3"><div className="font-bold text-gray-900">{edu.level}</div><div className="text-gray-600">{edu.degreeName} {edu.institution ? `@ ${edu.institution}` : ''}</div>{edu.fieldOfStudy && <div className="text-gray-600 italic">Major: {edu.fieldOfStudy}</div>}<div className="text-xs text-gray-500">GPAX: {edu.gpax} | {edu.startYear}-{edu.endYear}</div></div>))}</div>);
           }
-          // Special handling for fullName to show title
-          if (field.id === 'fullName') {
-              val = formData.fullName;
-          } else {
-              val = formData[field.id as keyof Applicant];
-          }
+          if (field.id === 'fullName') { val = formData.fullName; } else { val = formData[field.id as keyof Applicant]; }
       } else {
           val = formData.customData?.[field.id];
-          if (field.type === 'score' && typeof val === 'object') {
-              val = (val as any).noScore ? "Not yet available" : `${(val as any).exam}: ${(val as any).score}`;
-          } else if (Array.isArray(val)) {
-              val = val.join(', ');
-          } else if (field.type === 'checkbox' && !field.options) {
-              val = val ? 'Yes' : 'No';
-          }
+          if (field.type === 'score' && typeof val === 'object') { val = (val as any).noScore ? "Not yet available" : `${(val as any).exam}: ${(val as any).score}`; } else if (Array.isArray(val)) { val = val.join(', '); } else if (field.type === 'checkbox' && !field.options) { val = val ? 'Yes' : 'No'; }
       }
-
-      return (
-          <div key={field.id} className={field.type === 'score' || field.id === 'educations' || field.id === 'address' ? 'md:col-span-2' : ''}>
-              <span className="block text-xs font-bold text-gray-500 uppercase mb-1">{field.label}</span>
-              <div className="text-sm font-medium text-gray-900 break-words">{String(val || '-')}</div>
-          </div>
-      );
+      return (<div key={field.id} className={field.type === 'score' || field.id === 'educations' || field.id === 'address' ? 'md:col-span-2' : ''}><span className="block text-xs font-bold text-gray-500 uppercase mb-1">{field.label}</span><div className="text-sm font-medium text-gray-900 break-words">{String(val || '-')}</div></div>);
   };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col pb-32">
-      {/* Top Navbar */}
       <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
@@ -1619,152 +800,78 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
               </div>
               <h1 className="text-xl font-bold text-gray-900">UniAdmit Portal</h1>
             </div>
-            
-            {/* Right Side Navigation */}
             <div className="flex items-center space-x-2 sm:space-x-4">
-                {/* Language Switcher */}
-                <div className="relative">
-                    <button 
-                        onClick={() => { setIsLangDropdownOpen(!isLangDropdownOpen); setIsNotiDropdownOpen(false); setIsProfileDropdownOpen(false); }}
-                        className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors flex items-center" 
-                        title="Change Language"
-                    >
-                        <Globe className="w-5 h-5" />
-                        <span className="ml-1 text-xs font-bold">{currentLang}</span>
-                    </button>
-                    {isLangDropdownOpen && (
-                        <div className="absolute right-0 top-12 w-32 bg-white rounded-lg shadow-xl border border-gray-100 py-1 z-[60] animate-fade-in origin-top-right">
-                            <button onClick={() => { setCurrentLang('EN'); setIsLangDropdownOpen(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${currentLang === 'EN' ? 'font-bold text-brand-600' : 'text-gray-700'}`}>English</button>
-                            <button onClick={() => { setCurrentLang('TH'); setIsLangDropdownOpen(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${currentLang === 'TH' ? 'font-bold text-brand-600' : 'text-gray-700'}`}>ภาษาไทย</button>
-                        </div>
-                    )}
-                </div>
-
-                {/* Notification Bell */}
-                <div className="relative">
-                    <button 
-                        onClick={() => { setIsNotiDropdownOpen(!isNotiDropdownOpen); setIsLangDropdownOpen(false); setIsProfileDropdownOpen(false); }}
-                        className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors relative" 
-                        title="Notifications"
-                    >
-                        <Bell className="w-5 h-5" />
-                        {unreadCount > 0 && (
-                            <span className="absolute top-1 right-1 w-4 h-4 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white">{unreadCount}</span>
-                        )}
-                    </button>
-                    {isNotiDropdownOpen && (
-                        <div className="absolute right-0 top-12 w-80 bg-white rounded-xl shadow-xl border border-gray-100 z-[60] animate-fade-in origin-top-right overflow-hidden">
-                            <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                                <h3 className="font-bold text-sm text-gray-900">Notifications</h3>
-                                <span className="text-xs text-gray-500">{unreadCount} new</span>
+              <div className="relative">
+                <button onClick={() => setIsLangDropdownOpen(!isLangDropdownOpen)} className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors flex items-center">
+                  <Globe className="w-5 h-5" /><span className="ml-1 text-xs font-bold">{currentLang}</span>
+                </button>
+                {isLangDropdownOpen && (
+                  <div className="absolute right-0 top-12 w-32 bg-white rounded-lg shadow-xl border border-gray-100 py-1 z-[60] animate-fade-in origin-top-right">
+                    <button onClick={() => { setCurrentLang('EN'); setIsLangDropdownOpen(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${currentLang === 'EN' ? 'font-bold text-brand-600' : 'text-gray-700'}`}>English</button>
+                    <button onClick={() => { setCurrentLang('TH'); setIsLangDropdownOpen(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${currentLang === 'TH' ? 'font-bold text-brand-600' : 'text-gray-700'}`}>ภาษาไทย</button>
+                  </div>
+                )}
+              </div>
+              <div className="relative">
+                <button onClick={() => setIsNotiDropdownOpen(!isNotiDropdownOpen)} className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors relative">
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && <span className="absolute top-1 right-1 w-4 h-4 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white">{unreadCount}</span>}
+                </button>
+                {isNotiDropdownOpen && (
+                  <div className="absolute right-0 top-12 w-80 bg-white rounded-xl shadow-xl border border-gray-100 z-[60] animate-fade-in origin-top-right overflow-hidden">
+                    <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center"><h3 className="font-bold text-sm text-gray-900">Notifications</h3><span className="text-xs text-gray-500">{unreadCount} new</span></div>
+                    <div className="max-h-80 overflow-y-auto">
+                      {notifications.length > 0 ? (
+                        notifications.map((note) => (
+                          <div key={note.id} className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors ${!note.read ? 'bg-blue-50/30' : ''}`}>
+                            <div className="flex gap-3">
+                              <div className={`mt-1 p-1.5 rounded-full h-fit flex-shrink-0 ${note.type === 'urgent' ? 'bg-red-100 text-red-600' : note.type === 'success' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
+                                {note.type === 'urgent' ? <AlertCircle className="w-4 h-4" /> : note.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-bold text-gray-900">{note.title}</h4>
+                                <p className="text-xs text-gray-600 mt-1 leading-relaxed">{note.message}</p>
+                                <span className="text-[10px] text-gray-400 mt-2 block">{note.time}</span>
+                              </div>
                             </div>
-                            <div className="max-h-80 overflow-y-auto">
-                                {notifications.length > 0 ? (
-                                    notifications.map((note) => (
-                                        <div key={note.id} className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors ${!note.read ? 'bg-blue-50/30' : ''}`}>
-                                            <div className="flex gap-3">
-                                                <div className={`mt-1 p-1.5 rounded-full h-fit flex-shrink-0 
-                                                    ${note.type === 'urgent' ? 'bg-red-100 text-red-600' : 
-                                                      note.type === 'success' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
-                                                    {note.type === 'urgent' ? <AlertCircle className="w-4 h-4" /> : 
-                                                     note.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
-                                                </div>
-                                                <div>
-                                                    <h4 className="text-sm font-bold text-gray-900">{note.title}</h4>
-                                                    <p className="text-xs text-gray-600 mt-1 leading-relaxed">{note.message}</p>
-                                                    <span className="text-[10px] text-gray-400 mt-2 block">{note.time}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="p-8 text-center text-gray-400">
-                                        <Bell className="w-8 h-8 mx-auto mb-2 opacity-20"/>
-                                        <p className="text-sm">No notifications</p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Profile Dropdown */}
-                <div className="relative">
-                    <button 
-                        onClick={() => { setIsProfileDropdownOpen(!isProfileDropdownOpen); setIsLangDropdownOpen(false); setIsNotiDropdownOpen(false); }}
-                        className="flex items-center focus:outline-none"
-                    >
-                        <div className="w-9 h-9 rounded-full bg-brand-600 text-white flex items-center justify-center font-bold text-sm border-2 border-white shadow-sm hover:ring-2 hover:ring-brand-200 transition-all">
-                            {applicant.documents['doc_profile_pic']?.status === 'uploaded' || applicant.documents['doc_profile_pic']?.status === 'approved' 
-                                ? <img src={applicant.documents['doc_profile_pic']?.fileUrl || `https://ui-avatars.com/api/?name=${applicant.fullName.replace(" ", "+")}`} alt="Profile" className="w-full h-full rounded-full object-cover" />
-                                : applicant.fullName ? applicant.fullName.charAt(0).toUpperCase() : <User className="w-5 h-5"/>
-                            }
-                        </div>
-                    </button>
-
-                    {isProfileDropdownOpen && (
-                        <div className="absolute right-0 top-12 w-72 bg-white rounded-xl shadow-2xl border border-gray-100 py-2 z-[60] animate-fade-in origin-top-right">
-                            <div className="px-4 py-4 border-b border-gray-100 bg-gray-50/50">
-                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Signed in as</p>
-                                <p className="text-sm font-bold text-gray-900 truncate">{applicant.fullName || 'Applicant'}</p>
-                                <p className="text-xs text-gray-500 truncate">{applicant.email}</p>
-                            </div>
-                            
-                            <div className="py-2">
-                                <a href="#" onClick={(e) => { e.preventDefault(); setActiveSubSection('profile'); setIsProfileDropdownOpen(false); }} className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group">
-                                    <User className="w-4 h-4 mr-3 text-gray-400 group-hover:text-brand-600" /> Profile
-                                </a>
-                                <a href="#" onClick={(e) => { e.preventDefault(); setActiveSubSection('my_purchases'); setIsProfileDropdownOpen(false); }} className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group">
-                                    <CreditCard className="w-4 h-4 mr-3 text-gray-400 group-hover:text-brand-600" /> My Purchases
-                                </a>
-                                <a href="#" onClick={(e) => { e.preventDefault(); setIsProfileDropdownOpen(false); }} className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group">
-                                    <Settings className="w-4 h-4 mr-3 text-gray-400 group-hover:text-brand-600" /> Settings
-                                </a>
-                            </div>
-
-                            <div className="border-t border-gray-100 py-2">
-                                <a href="#" onClick={(e) => { e.preventDefault(); setIsProfileDropdownOpen(false); }} className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group">
-                                    <HelpCircle className="w-4 h-4 mr-3 text-gray-400 group-hover:text-brand-600" /> Help Center
-                                </a>
-                                <button 
-                                    onClick={() => { onLogout(); setIsProfileDropdownOpen(false); }}
-                                    className="flex w-full items-center px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 font-medium transition-colors"
-                                >
-                                    <LogOut className="w-4 h-4 mr-3" /> Log Out
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
+                          </div>
+                        ))
+                      ) : (<div className="p-8 text-center text-gray-400"><Bell className="w-8 h-8 mx-auto mb-2 opacity-20"/><p className="text-sm">No notifications</p></div>)}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="relative">
+                <button onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)} className="flex items-center focus:outline-none">
+                  <div className="w-9 h-9 rounded-full bg-brand-600 text-white flex items-center justify-center font-bold text-sm border-2 border-white shadow-sm hover:ring-2 hover:ring-brand-200 transition-all">
+                    {applicant.documents['doc_profile_pic']?.status === 'uploaded' || applicant.documents['doc_profile_pic']?.status === 'approved' ? <img src={applicant.documents['doc_profile_pic']?.fileUrl || `https://ui-avatars.com/api/?name=${applicant.fullName.replace(" ", "+")}`} alt="Profile" className="w-full h-full rounded-full object-cover" /> : applicant.fullName ? applicant.fullName.charAt(0).toUpperCase() : <User className="w-5 h-5"/>}
+                  </div>
+                </button>
+                {isProfileDropdownOpen && (
+                  <div className="absolute right-0 top-12 w-72 bg-white rounded-xl shadow-2xl border border-gray-100 py-2 z-[60] animate-fade-in origin-top-right">
+                    <div className="px-4 py-4 border-b border-gray-100 bg-gray-50/50"><p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Signed in as</p><p className="text-sm font-bold text-gray-900 truncate">{applicant.fullName || 'Applicant'}</p><p className="text-xs text-gray-500 truncate">{applicant.email}</p></div>
+                    <div className="py-2"><a href="#" onClick={(e) => { e.preventDefault(); setActiveSubSection('profile'); setIsProfileDropdownOpen(false); }} className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group"><User className="w-4 h-4 mr-3 text-gray-400 group-hover:text-brand-600" /> Profile</a><a href="#" onClick={(e) => { e.preventDefault(); setActiveSubSection('my_purchases'); setIsProfileDropdownOpen(false); }} className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group"><CreditCard className="w-4 h-4 mr-3 text-gray-400 group-hover:text-brand-600" /> My Purchases</a><a href="#" onClick={(e) => { e.preventDefault(); setIsProfileDropdownOpen(false); }} className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group"><Settings className="w-4 h-4 mr-3 text-gray-400 group-hover:text-brand-600" /> Settings</a></div>
+                    <div className="border-t border-gray-100 py-2"><a href="#" onClick={(e) => { e.preventDefault(); setIsProfileDropdownOpen(false); }} className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group"><HelpCircle className="w-4 h-4 mr-3 text-gray-400 group-hover:text-brand-600" /> Help Center</a><button onClick={() => { onLogout(); setIsProfileDropdownOpen(false); }} className="flex w-full items-center px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 font-medium transition-colors"><LogOut className="w-4 h-4 mr-3" /> Log Out</button></div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
-        
-        {/* Top Status Stepper */}
         <div className="bg-white border-t border-gray-100">
           <div className="max-w-5xl mx-auto py-4 px-4">
             <div className="flex items-center justify-between relative">
               <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-1 bg-gray-200 -z-10"></div>
-              <div className="absolute left-0 top-1/2 transform -translate-y-1/2 h-1 bg-brand-500 -z-10 transition-all duration-500"
-                   style={{ width: `${((currentStep - 1) / 3) * 100}%` }}></div>
-              
+              <div className="absolute left-0 top-1/2 transform -translate-y-1/2 h-1 bg-brand-500 -z-10 transition-all duration-500" style={{ width: `${((currentStep - 1) / 3) * 100}%` }}></div>
               {steps.map((step) => {
                 const isActive = step.id === currentStep;
                 const isCompleted = step.id < currentStep;
                 return (
-                  <div 
-                    key={step.id} 
-                    onClick={() => handleStepClick(step.id)}
-                    className="flex flex-col items-center bg-white px-2 cursor-pointer group z-10"
-                  >
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border-2 transition-colors
-                      ${isActive ? 'border-brand-600 bg-brand-600 text-white' : 
-                        isCompleted ? 'border-brand-600 bg-white text-brand-600' : 'border-gray-300 bg-white text-gray-400 group-hover:border-brand-400 group-hover:text-brand-400'}`}>
+                  <div key={step.id} onClick={() => handleStepClick(step.id)} className="flex flex-col items-center bg-white px-2 cursor-pointer group z-10">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border-2 transition-colors ${isActive ? 'border-brand-600 bg-brand-600 text-white' : isCompleted ? 'border-brand-600 bg-white text-brand-600' : 'border-gray-300 bg-white text-gray-400 group-hover:border-brand-400 group-hover:text-brand-400'}`}>
                       {isCompleted ? <Check className="w-5 h-5" /> : step.id}
                     </div>
-                    <span className={`mt-2 text-xs font-semibold ${isActive || isCompleted ? 'text-brand-700' : 'text-gray-500 group-hover:text-brand-500'}`}>
-                      {step.name}
-                    </span>
+                    <span className={`mt-2 text-xs font-semibold ${isActive || isCompleted ? 'text-brand-700' : 'text-gray-500 group-hover:text-brand-500'}`}>{step.name}</span>
                   </div>
                 );
               })}
@@ -1773,1061 +880,371 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
         </div>
       </nav>
 
-      {/* Main Content Area */}
       <main className="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
-        
-        {/* VIEW: MY PURCHASES */}
         {activeSubSection === 'my_purchases' && (
-            <div className="space-y-6">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h2 className="text-2xl font-bold text-gray-900 flex items-center"><CreditCard className="w-6 h-6 mr-3 text-brand-600"/> My Purchases & Receipts</h2>
-                        <p className="text-gray-500 mt-1">View your payment history and download receipts.</p>
-                    </div>
-                    <Button variant="outline" onClick={() => setActiveSubSection('profile')}>Back to Application</Button>
-                </div>
-
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="p-4 border-b bg-gray-50 grid grid-cols-12 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                        <div className="col-span-6">Item Description</div>
-                        <div className="col-span-2 text-center">Status</div>
-                        <div className="col-span-2 text-center">Amount</div>
-                        <div className="col-span-2 text-right">Action</div>
-                    </div>
-                    <div className="divide-y divide-gray-100">
-                        {/* Application Fee */}
-                        <div className="p-4 grid grid-cols-12 items-center hover:bg-gray-50">
-                            <div className="col-span-6">
-                                <div className="font-bold text-gray-900">Application Fee</div>
-                                <div className="text-xs text-gray-500">Processing fee for initial application</div>
-                            </div>
-                            <div className="col-span-2 text-center">
-                                <span className={`px-2 py-1 rounded text-xs font-bold border ${formData.feeStatuses?.application === 'PAID' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-yellow-100 text-yellow-700 border-yellow-200'}`}>
-                                    {formData.feeStatuses?.application}
-                                </span>
-                            </div>
-                            <div className="col-span-2 text-center font-mono text-gray-600">500 THB</div>
-                            <div className="col-span-2 text-right">
-                                <Button size="sm" variant="outline" disabled={formData.feeStatuses?.application !== 'PAID'} onClick={() => handleDownloadReceipt('Application Fee')}>
-                                    <FileDown className="w-4 h-4 mr-1"/> Receipt
-                                </Button>
-                            </div>
-                        </div>
-
-                        {/* Interview Fee */}
-                        <div className="p-4 grid grid-cols-12 items-center hover:bg-gray-50">
-                            <div className="col-span-6">
-                                <div className="font-bold text-gray-900">Interview Fee</div>
-                                <div className="text-xs text-gray-500">Required for booking interview slot</div>
-                            </div>
-                            <div className="col-span-2 text-center">
-                                <span className={`px-2 py-1 rounded text-xs font-bold border ${formData.feeStatuses?.interview === 'PAID' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>
-                                    {formData.feeStatuses?.interview || 'UNPAID'}
-                                </span>
-                            </div>
-                            <div className="col-span-2 text-center font-mono text-gray-600">200 THB</div>
-                            <div className="col-span-2 text-right">
-                                <Button size="sm" variant="outline" disabled={formData.feeStatuses?.interview !== 'PAID'} onClick={() => handleDownloadReceipt('Interview Fee')}>
-                                    <FileDown className="w-4 h-4 mr-1"/> Receipt
-                                </Button>
-                            </div>
-                        </div>
-
-                        {/* Tuition Fee */}
-                        <div className="p-4 grid grid-cols-12 items-center hover:bg-gray-50">
-                            <div className="col-span-6">
-                                <div className="font-bold text-gray-900">Tuition Fee / Enrollment</div>
-                                <div className="text-xs text-gray-500">First semester tuition fee</div>
-                            </div>
-                            <div className="col-span-2 text-center">
-                                <span className={`px-2 py-1 rounded text-xs font-bold border ${formData.feeStatuses?.tuition === 'PAID' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>
-                                    {formData.feeStatuses?.tuition || 'UNPAID'}
-                                </span>
-                            </div>
-                            <div className="col-span-2 text-center font-mono text-gray-600">15,000 THB</div>
-                            <div className="col-span-2 text-right">
-                                <Button size="sm" variant="outline" disabled={formData.feeStatuses?.tuition !== 'PAID'} onClick={() => handleDownloadReceipt('Tuition Fee')}>
-                                    <FileDown className="w-4 h-4 mr-1"/> Receipt
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+          <div className="space-y-6">
+            <div className="flex justify-between items-center mb-6"><div><h2 className="text-2xl font-bold text-gray-900 flex items-center"><CreditCard className="w-6 h-6 mr-3 text-brand-600"/> My Purchases & Receipts</h2><p className="text-gray-500 mt-1">View your payment history and download receipts.</p></div><Button variant="outline" onClick={() => setActiveSubSection('profile')}>Back to Application</Button></div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"><div className="p-4 border-b bg-gray-50 grid grid-cols-12 text-xs font-bold text-gray-500 uppercase tracking-wider"><div className="col-span-6">Item Description</div><div className="col-span-2 text-center">Status</div><div className="col-span-2 text-center">Amount</div><div className="col-span-2 text-right">Action</div></div><div className="divide-y divide-gray-100"><div className="p-4 grid grid-cols-12 items-center hover:bg-gray-50"><div className="col-span-6"><div className="font-bold text-gray-900">Application Fee</div><div className="text-xs text-gray-500">Processing fee for initial application</div></div><div className="col-span-2 text-center"><span className={`px-2 py-1 rounded text-xs font-bold border ${formData.feeStatuses?.application === 'PAID' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-yellow-100 text-yellow-700 border-yellow-200'}`}>{formData.feeStatuses?.application}</span></div><div className="col-span-2 text-center font-mono text-gray-600">500 THB</div><div className="col-span-2 text-right"><Button size="sm" variant="outline" disabled={formData.feeStatuses?.application !== 'PAID'} onClick={() => handleDownloadReceipt('Application Fee')}><FileDown className="w-4 h-4 mr-1"/> Receipt</Button></div></div><div className="p-4 grid grid-cols-12 items-center hover:bg-gray-50"><div className="col-span-6"><div className="font-bold text-gray-900">Interview Fee</div><div className="text-xs text-gray-500">Required for booking interview slot</div></div><div className="col-span-2 text-center"><span className={`px-2 py-1 rounded text-xs font-bold border ${formData.feeStatuses?.interview === 'PAID' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>{formData.feeStatuses?.interview || 'UNPAID'}</span></div><div className="col-span-2 text-center font-mono text-gray-600">200 THB</div><div className="col-span-2 text-right"><Button size="sm" variant="outline" disabled={formData.feeStatuses?.interview !== 'PAID'} onClick={() => handleDownloadReceipt('Interview Fee')}><FileDown className="w-4 h-4 mr-1"/> Receipt</Button></div></div><div className="p-4 grid grid-cols-12 items-center hover:bg-gray-50"><div className="col-span-6"><div className="font-bold text-gray-900">Tuition Fee / Enrollment</div><div className="text-xs text-gray-500">First semester tuition fee</div></div><div className="col-span-2 text-center"><span className={`px-2 py-1 rounded text-xs font-bold border ${formData.feeStatuses?.tuition === 'PAID' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>{formData.feeStatuses?.tuition || 'UNPAID'}</span></div><div className="col-span-2 text-center font-mono text-gray-600">15,000 THB</div><div className="col-span-2 text-right"><Button size="sm" variant="outline" disabled={formData.feeStatuses?.tuition !== 'PAID'} onClick={() => handleDownloadReceipt('Tuition Fee')}><FileDown className="w-4 h-4 mr-1"/> Receipt</Button></div></div></div></div>
+          </div>
         )}
 
-        {/* STEP 1: ยื่นใบสมัคร (Application Form) */}
         {activeSubSection !== 'my_purchases' && currentStep === 1 && (
           <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200 flex flex-col md:flex-row min-h-[600px]">
-            {/* Left Sidebar */}
             <aside className="w-full md:w-64 bg-gray-50 border-r border-gray-200 flex-shrink-0">
-              <div className="p-6">
-                <h2 className="text-lg font-bold text-gray-900 mb-1">Application</h2>
-                <p className="text-xs text-gray-500">Complete all sections</p>
-              </div>
+              <div className="p-6"><h2 className="text-lg font-bold text-gray-900 mb-1">Application</h2><p className="text-xs text-gray-500">Complete all sections</p></div>
               <nav className="space-y-1 px-2 pb-6">
-                {/* Group 1: Input Data */}
-                <button onClick={() => setActiveSubSection('profile')}
-                  className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${activeSubSection === 'profile' ? 'bg-brand-50 text-brand-700 border-l-4 border-brand-600' : 'text-gray-600 hover:bg-gray-100'}`}>
-                  <User className={`mr-3 h-5 w-5 ${isProfileComplete() ? 'text-green-500' : 'text-gray-400'}`} />
-                  Personal Info
-                </button>
-                <button onClick={() => setActiveSubSection('docs')}
-                  className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${activeSubSection === 'docs' ? 'bg-brand-50 text-brand-700 border-l-4 border-brand-600' : 'text-gray-600 hover:bg-gray-100'}`}>
-                  <Upload className={`mr-3 h-5 w-5 ${isDocsComplete() ? 'text-green-500' : 'text-gray-400'}`} />
-                  Documents
-                </button>
-                <button onClick={() => setActiveSubSection('test')}
-                  className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${activeSubSection === 'test' ? 'bg-brand-50 text-brand-700 border-l-4 border-brand-600' : 'text-gray-600 hover:bg-gray-100'}`}>
-                  <PenTool className={`mr-3 h-5 w-5 ${isExamComplete() ? 'text-green-500' : 'text-gray-400'}`} />
-                  Entrance Test
-                </button>
-
-                {/* Divider */}
+                <button onClick={() => setActiveSubSection('profile')} className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${activeSubSection === 'profile' ? 'bg-brand-50 text-brand-700 border-l-4 border-brand-600' : 'text-gray-600 hover:bg-gray-100'}`}><User className={`mr-3 h-5 w-5 ${isProfileComplete() ? 'text-green-500' : 'text-gray-400'}`} />Personal Info</button>
+                <button onClick={() => setActiveSubSection('docs')} className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${activeSubSection === 'docs' ? 'bg-brand-50 text-brand-700 border-l-4 border-brand-600' : 'text-gray-600 hover:bg-gray-100'}`}><Upload className={`mr-3 h-5 w-5 ${isDocsComplete() ? 'text-green-500' : 'text-gray-400'}`} />Documents</button>
+                <button onClick={() => setActiveSubSection('test')} className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${activeSubSection === 'test' ? 'bg-brand-50 text-brand-700 border-l-4 border-brand-600' : 'text-gray-600 hover:bg-gray-100'}`}><PenTool className={`mr-3 h-5 w-5 ${isExamComplete() ? 'text-green-500' : 'text-gray-400'}`} />Entrance Test</button>
                 <div className="my-4 border-t border-gray-200 mx-4"></div>
                 <div className="px-4 mb-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Finalize</div>
-
-                {/* Group 2: Sign & Pay */}
-                <button 
-                  onClick={() => canProceedToReview() && setActiveSubSection('esign')}
-                  disabled={!canProceedToReview()}
-                  className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors 
-                    ${activeSubSection === 'esign' ? 'bg-brand-50 text-brand-700 border-l-4 border-brand-600' : 
-                      !canProceedToReview() ? 'text-gray-400 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-100'}`}>
-                  <FileCheck className={`mr-3 h-5 w-5 ${eSignChecked ? 'text-green-500' : 'text-gray-400'}`} />
-                  Review & E-Sign
-                </button>
-                <button 
-                  onClick={() => canProceedToReview() && eSignChecked && setActiveSubSection('payment')}
-                  disabled={!canProceedToReview() || !eSignChecked}
-                  className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors 
-                    ${activeSubSection === 'payment' ? 'bg-brand-50 text-brand-700 border-l-4 border-brand-600' : 
-                      (!canProceedToReview() || !eSignChecked) ? 'text-gray-400 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-100'}`}>
-                  <CreditCard className="mr-3 h-5 w-5 text-gray-400" />
-                  Payment
-                </button>
+                <button onClick={() => canProceedToReview() && setActiveSubSection('esign')} disabled={!canProceedToReview()} className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${activeSubSection === 'esign' ? 'bg-brand-50 text-brand-700 border-l-4 border-brand-600' : !canProceedToReview() ? 'text-gray-400 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-100'}`}><FileCheck className={`mr-3 h-5 w-5 ${eSignChecked ? 'text-green-500' : 'text-gray-400'}`} />Review & E-Sign</button>
+                <button onClick={() => canProceedToReview() && eSignChecked && setActiveSubSection('payment')} disabled={!canProceedToReview() || !eSignChecked} className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${activeSubSection === 'payment' ? 'bg-brand-50 text-brand-700 border-l-4 border-brand-600' : (!canProceedToReview() || !eSignChecked) ? 'text-gray-400 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-100'}`}><CreditCard className="mr-3 h-5 w-5 text-gray-400" />Payment</button>
               </nav>
             </aside>
-
-            {/* Right Content */}
             <div className="flex-1 p-8 overflow-y-auto bg-gray-50 md:bg-white">
-              {/* 1. Personal Info */}
-              {activeSubSection === 'profile' && (
-                <div>
-                  <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold text-gray-900">1. Personal Information</h2>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Dynamic Field Rendering */}
-                      {fieldConfigs.filter(f => !f.isHidden).map(field => renderField(field))}
-                  </div>
-                  <div className="mt-8 flex justify-end">
-                    <Button onClick={handleProfileSave}>Save & Next</Button>
-                  </div>
-                </div>
-              )}
-
-              {/* 2. Documents */}
-              {activeSubSection === 'docs' && (
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-6">2. Document Upload</h2>
-
-                  {isEditRestricted && (
-                    <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-lg mb-6 flex items-start animate-fade-in">
-                      <AlertTriangle className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="font-bold">Application Returned</p>
-                        <p className="text-sm">Please correct the rejected documents below. Other fields are locked.</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Profile Picture Upload Section (if config exists) */}
-                  {(Object.values(formData.documents) as DocumentItem[]).filter(d => d.configId === 'doc_conf_pic').map(doc => (
-                      <div key={doc.id} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mb-6 flex flex-col md:flex-row items-center gap-6">
-                          <div className="w-32 h-32 flex-shrink-0">
-                              {doc.status === DocumentStatus.UPLOADED || doc.status === DocumentStatus.APPROVED ? (
-                                  <img src={doc.fileUrl || `https://ui-avatars.com/api/?name=${formData.fullName.replace(" ", "+")}`} alt="Profile" className="w-full h-full rounded-full object-cover border-4 border-gray-100 shadow-sm" />
-                              ) : (
-                                  <div className="w-full h-full rounded-full bg-gray-100 flex items-center justify-center border-4 border-gray-50 text-gray-400">
-                                      <User className="w-12 h-12" />
-                                  </div>
-                              )}
-                          </div>
-                          <div className="flex-1 text-center md:text-left">
-                              <h3 className="font-bold text-lg text-gray-900">Profile Picture</h3>
-                              <p className="text-sm text-gray-500 mb-3">Upload a clear photo of yourself.</p>
-                              
-                              {/* Cropper UI Modal */}
-                              {isCropOpen && originalImage && (
-                                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4">
-                                      <div className="bg-white rounded-xl overflow-hidden shadow-2xl max-w-lg w-full flex flex-col">
-                                          <div className="p-4 border-b border-gray-100 flex justify-between items-center">
-                                              <h3 className="font-bold text-gray-800">Adjust Photo</h3>
-                                              <button onClick={() => setIsCropOpen(false)}><X className="w-5 h-5 text-gray-500"/></button>
-                                          </div>
-                                          <div className="relative h-80 bg-gray-900 overflow-hidden cursor-move touch-none flex items-center justify-center"
-                                               onMouseDown={handleCropMouseDown} onMouseMove={handleCropMouseMove} onMouseUp={handleCropMouseUp} onMouseLeave={handleCropMouseUp}
-                                               onTouchStart={handleCropMouseDown} onTouchMove={handleCropMouseMove} onTouchEnd={handleCropMouseUp}
-                                          >
-                                              <img 
-                                                  ref={cropImgRef}
-                                                  src={originalImage} 
-                                                  alt="Crop" 
-                                                  style={{ transform: `scale(${cropScale}) translate(${cropPos.x}px, ${cropPos.y}px)`, transition: isDraggingCrop ? 'none' : 'transform 0.1s' }}
-                                                  className="max-w-none"
-                                                  draggable={false}
-                                              />
-                                              <div className="absolute inset-0 pointer-events-none border-2 border-white opacity-50 rounded-full w-64 h-64 m-auto shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]"></div>
-                                          </div>
-                                          <div className="p-4 bg-white border-t border-gray-100">
-                                              <div className="flex items-center gap-4 mb-4">
-                                                  <ZoomOut className="w-4 h-4 text-gray-400"/>
-                                                  <input type="range" min="0.5" max="3" step="0.1" value={cropScale} onChange={(e) => setCropScale(parseFloat(e.target.value))} className="flex-1" />
-                                                  <ZoomIn className="w-4 h-4 text-gray-400"/>
-                                              </div>
-                                              <Button className="w-full" onClick={handleCropSave}>Save Photo</Button>
-                                          </div>
-                                      </div>
-                                  </div>
-                              )}
-
-                              <div className="relative inline-block">
-                                  <input type="file" accept="image/*" onChange={handleProfilePicSelect} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                                  <Button variant="outline" size="sm" className="relative z-10 pointer-events-none">
-                                      <ImageIcon className="w-4 h-4 mr-2"/> {doc.status === 'uploaded' ? 'Change Photo' : 'Upload Photo'}
-                                  </Button>
-                              </div>
-                          </div>
-                      </div>
-                  ))}
-
-                  <div className="space-y-4">
-                    {(Object.values(formData.documents) as DocumentItem[]).filter(d => d.configId !== 'doc_conf_pic').sort((a,b) => {
-                        // Sort by config order
-                        const confA = docConfigs.find(c => c.id === a.configId);
-                        const confB = docConfigs.find(c => c.id === b.configId);
-                        return (confA?.order || 99) - (confB?.order || 99);
-                    }).map((doc: DocumentItem) => {
-                       const isRejected = doc.status === DocumentStatus.REJECTED;
-                       const canEdit = !isEditRestricted || isRejected;
-                       const docConfig = docConfigs.find(c => c.id === doc.configId);
-                       const isRequired = docConfig ? docConfig.isRequired : true;
-
-                       return (
-                        <div key={doc.id} className={`border rounded-lg p-4 bg-white hover:bg-gray-50 transition-colors ${isRejected ? 'border-red-300 ring-1 ring-red-200' : 'border-gray-200'}`}>
-                            <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center">
-                                    {doc.status === DocumentStatus.UPLOADED || doc.status === DocumentStatus.APPROVED ? 
-                                        <CheckCircle className="text-green-500 mr-3 h-6 w-6" /> : 
-                                        doc.status === DocumentStatus.REJECTED ? <X className="text-red-500 mr-3 h-6 w-6" /> :
-                                        <div className="w-6 h-6 border-2 border-gray-300 rounded-full mr-3"></div>
-                                    }
-                                    <div>
-                                        <h4 className="font-semibold text-gray-900 flex items-center">
-                                            {doc.name} 
-                                            {isRequired ? <span className="text-red-500 ml-1">*</span> : <span className="text-xs text-gray-400 ml-2 font-normal">(Optional)</span>}
-                                        </h4>
-                                        {doc.reviewNote && <p className="text-xs text-red-600 font-bold mt-1">Note: {doc.reviewNote}</p>}
-                                        {!doc.fileName && <p className="text-xs text-gray-400 mt-0.5">No file uploaded</p>}
-                                    </div>
-                                </div>
-                                {canEdit && (
-                                    <label className="cursor-pointer">
-                                        <input type="file" className="hidden" onChange={() => handleFileUpload(doc.id)} />
-                                        <span className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-100">
-                                            <Upload className="w-4 h-4 mr-2" /> {doc.status === 'pending' || !doc.fileName ? 'Upload' : 'Re-upload'}
-                                        </span>
-                                    </label>
-                                )}
-                            </div>
-                            
-                            {doc.fileName && (
-                                <div className="flex items-center justify-between bg-gray-100 rounded px-3 py-2 ml-9">
-                                    <div className="flex items-center text-sm text-gray-600 truncate">
-                                        <FileText className="w-4 h-4 mr-2 flex-shrink-0" />
-                                        <span className="truncate">{doc.fileName}</span>
-                                    </div>
-                                    {canEdit && doc.status === DocumentStatus.UPLOADED && (
-                                        <button onClick={() => handleFileDelete(doc.id)} className="text-gray-400 hover:text-red-500 ml-2" title="Remove file">
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )})}
-                  </div>
-                  <div className="mt-8 flex justify-between">
-                    <Button variant="outline" onClick={() => setActiveSubSection('profile')}>Back</Button>
-                    <Button onClick={handleDocsNext}>Save & Next</Button>
-                  </div>
-                </div>
-              )}
-
-              {/* 3. Test - Exam Dashboard & Runner */}
-              {activeSubSection === 'test' && (
-                <div>
-                  {!selectedSuiteId ? (
-                    <div>
-                         <h2 className="text-2xl font-bold text-gray-900 mb-2">3. Entrance Test Suites</h2>
-                         <p className="text-gray-500 mb-6">Please complete all test suites below.</p>
-                         
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {examSuites.map(suite => {
-                                const progress = calculateSuiteProgress(suite.id);
-                                const isDone = progress.total > 0 && progress.current === progress.total;
-                                
-                                return (
-                                    <div key={suite.id} className={`border-2 rounded-xl p-6 flex flex-col justify-between transition-all
-                                        ${isDone ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-white hover:border-brand-300 hover:shadow-md'}`}>
-                                        <div>
-                                            <div className="flex justify-between items-start mb-3">
-                                                <h3 className="text-lg font-bold text-gray-900">{suite.title}</h3>
-                                                {isDone && <CheckCircle className="text-green-600 w-6 h-6" />}
-                                            </div>
-                                            <p className="text-sm text-gray-500 mb-4">{suite.description}</p>
-                                        </div>
-                                        <div>
-                                            <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
-                                                <span>Progress</span>
-                                                <span>{progress.current} / {progress.total} items</span>
-                                            </div>
-                                            <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
-                                                <div className={`h-2.5 rounded-full ${isDone ? 'bg-green-500' : 'bg-brand-500'}`} style={{ width: `${progress.percentage}%` }}></div>
-                                            </div>
-                                            <Button 
-                                                variant={isDone ? "outline" : "primary"} 
-                                                className="w-full justify-center"
-                                                onClick={() => setSelectedSuiteId(suite.id)}
-                                            >
-                                                {isDone ? 'Review Answers' : progress.current > 0 ? 'Continue Test' : 'Start Test'}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                         </div>
-                         <div className="mt-8 flex justify-between">
-                            <Button variant="outline" onClick={() => setActiveSubSection('docs')}>Back</Button>
-                            <Button 
-                                disabled={!isExamComplete()} 
-                                onClick={() => setActiveSubSection('esign')}
-                                className={isExamComplete() ? 'animate-pulse' : ''}
-                            >
-                                Save & Next
-                            </Button>
-                        </div>
-                    </div>
-                  ) : (
-                    /* Exam Runner */
-                    <div>
-                        <div className="flex items-center mb-6">
-                            <button onClick={handleSuiteReturn} className="mr-4 text-gray-500 hover:text-gray-700 p-2 rounded-full hover:bg-gray-100">
-                                <ChevronLeft className="w-6 h-6" />
-                            </button>
-                            <div>
-                                <h2 className="text-xl font-bold text-gray-900">
-                                    {examSuites.find(s => s.id === selectedSuiteId)?.title}
-                                </h2>
-                                <p className="text-sm text-gray-500">Your answers are saved automatically.</p>
-                            </div>
-                        </div>
-
-                        <div className="space-y-8 mb-8">
-                            {exams.filter(e => e.suiteId === selectedSuiteId).map((q, idx) => {
-                                const currentAnswer = formData.examAnswers?.[q.id];
-                                return (
-                                    <div key={q.id} className="bg-white p-6 border border-gray-200 rounded-lg shadow-sm">
-                                        <h4 className="text-base font-semibold text-gray-900 mb-4 flex items-start">
-                                            <span className="mr-2 text-gray-900 font-bold">Q{idx + 1}.</span> 
-                                            <div className="flex-1">
-                                                {q.text} 
-                                                {q.score > 0 && <span className="text-xs text-gray-400 font-normal ml-2">(Score: {q.score})</span>}
-                                            </div>
-                                        </h4>
-                                        
-                                        {q.type === QuestionType.MCQ_SINGLE && (
-                                            <div className="space-y-2 pl-4">
-                                                {q.options?.map(opt => (
-                                                    <div key={opt.id}>
-                                                        <label className={`flex items-center p-3 border rounded-md cursor-pointer transition-all duration-200
-                                                            ${isEditRestricted ? 'cursor-not-allowed opacity-70 bg-gray-50' : ''}
-                                                            ${currentAnswer === opt.id ? 'border-brand-600 ring-1 ring-brand-600 bg-brand-50' : 'border-gray-300 bg-white hover:bg-gray-50'}`}>
-                                                            <input 
-                                                                type="radio" 
-                                                                name={q.id} 
-                                                                className="hidden" 
-                                                                checked={currentAnswer === opt.id}
-                                                                onChange={() => !isEditRestricted && handleExamAnswerChange(q.id, opt.id)}
-                                                                disabled={isEditRestricted}
-                                                            />
-                                                            <div className={`flex-shrink-0 w-5 h-5 rounded-full border flex items-center justify-center mr-3 transition-colors
-                                                                ${currentAnswer === opt.id ? 'border-brand-600' : 'border-gray-300 bg-white'}`}>
-                                                                {currentAnswer === opt.id && <div className="w-2.5 h-2.5 rounded-full bg-brand-600" />}
-                                                            </div>
-                                                            <span className="text-sm font-medium text-gray-900">{opt.text}</span>
-                                                        </label>
-                                                        {/* Text input for "Other" option if selected */}
-                                                        {opt.allowInput && currentAnswer === opt.id && (
-                                                            <input 
-                                                                type="text" 
-                                                                className="mt-2 w-full border rounded p-2 text-sm ml-8"
-                                                                placeholder="Please specify..."
-                                                                value={formData.customData?.[`exam_other_${q.id}`] || ''}
-                                                                onChange={(e) => handleCustomDataChange(`exam_other_${q.id}`, e.target.value)}
-                                                                disabled={isEditRestricted}
-                                                            />
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        {q.type === QuestionType.MCQ_MULTI && (
-                                             <div className="space-y-2 pl-4">
-                                                 {q.options?.map(opt => {
-                                                     const selectedList = Array.isArray(currentAnswer) ? currentAnswer : [];
-                                                     const isSelected = selectedList.includes(opt.id);
-                                                     return (
-                                                        <label key={opt.id} className={`flex items-center p-3 border rounded-md cursor-pointer transition-all duration-200
-                                                            ${isEditRestricted ? 'cursor-not-allowed opacity-70 bg-gray-50' : ''}
-                                                            ${isSelected ? 'border-brand-600 ring-1 ring-brand-600 bg-brand-50' : 'border-gray-300 bg-white hover:bg-gray-50'}`}>
-                                                            <input 
-                                                                type="checkbox" 
-                                                                className="hidden" 
-                                                                checked={isSelected}
-                                                                onChange={(e) => {
-                                                                    if(isEditRestricted) return;
-                                                                    let newList = [...selectedList];
-                                                                    if(e.target.checked) newList.push(opt.id);
-                                                                    else newList = newList.filter(id => id !== opt.id);
-                                                                    handleExamAnswerChange(q.id, newList);
-                                                                }}
-                                                                disabled={isEditRestricted} 
-                                                            />
-                                                             <div className={`flex-shrink-0 w-5 h-5 rounded border flex items-center justify-center mr-3 transition-colors
-                                                                ${isSelected ? 'bg-brand-600 border-brand-600' : 'bg-white border-gray-300'}`}>
-                                                                {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
-                                                            </div>
-                                                            <span className="text-sm font-medium text-gray-900">{opt.text}</span>
-                                                        </label>
-                                                     );
-                                                 })}
-                                             </div>
-                                        )}
-
-                                        {q.type === QuestionType.ESSAY && (
-                                            <div className="pl-4">
-                                                <textarea 
-                                                    rows={4}
-                                                    className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 placeholder-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
-                                                    placeholder="Type your answer here..."
-                                                    value={typeof currentAnswer === 'string' ? currentAnswer : ''}
-                                                    onChange={(e) => handleExamAnswerChange(q.id, e.target.value)}
-                                                    disabled={isEditRestricted}
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        <div className="flex justify-end">
-                            <Button onClick={handleSuiteReturn} className="flex items-center">
-                                Save & Return <ArrowRight className="ml-2 w-4 h-4" />
-                            </Button>
-                        </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* 4. Review & E-Sign */}
-              {activeSubSection === 'esign' && (
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-6">4. Review & E-Sign</h2>
-                  
-                  {isEditRestricted && (
-                    <div className="bg-brand-50 border border-brand-200 p-4 rounded-lg mb-6 text-brand-700 text-sm font-medium flex items-center">
-                        <RefreshCw className="w-5 h-5 mr-2" />
-                        Status: Resubmission (Correcting Rejected Documents)
-                    </div>
-                  )}
-
-                  <div className="space-y-6 mb-8">
-                    {/* Personal Info Review */}
-                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                        <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center border-b pb-2">
-                            <User className="w-5 h-5 mr-2 text-brand-600" /> Personal Information
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-                            {fieldConfigs.filter(f => !f.isHidden).map(f => renderReadOnlyField(f))}
-                        </div>
-                    </div>
-
-                    {/* Documents Review */}
-                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                        <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center border-b pb-2">
-                            <Upload className="w-5 h-5 mr-2 text-brand-600" /> Documents Submitted
-                        </h3>
-                        <div className="space-y-3">
-                            {(Object.values(formData.documents) as DocumentItem[]).sort((a,b) => {
-                                const confA = docConfigs.find(c => c.id === a.configId);
-                                const confB = docConfigs.find(c => c.id === b.configId);
-                                return (confA?.order || 99) - (confB?.order || 99);
-                            }).map((doc: DocumentItem) => (
-                                <div key={doc.id} className="flex items-center justify-between bg-gray-50 p-3 rounded border border-gray-100">
-                                    <div className="flex items-center">
-                                        <div className={`p-1.5 rounded-full mr-3 ${doc.status === DocumentStatus.UPLOADED || doc.status === DocumentStatus.APPROVED ? 'bg-green-100' : 'bg-gray-200'}`}>
-                                            <FileText className={`w-4 h-4 ${doc.status === DocumentStatus.UPLOADED || doc.status === DocumentStatus.APPROVED ? 'text-green-600' : 'text-gray-500'}`} />
-                                        </div>
-                                        <div>
-                                            <div className="text-sm font-medium text-gray-900">{doc.name}</div>
-                                            {doc.fileName && <div className="text-xs text-gray-500">{doc.fileName}</div>}
-                                        </div>
-                                    </div>
-                                    <div className="text-xs font-bold">
-                                        {doc.status === DocumentStatus.UPLOADED || doc.status === DocumentStatus.APPROVED ? 
-                                            <span className="text-green-600 flex items-center"><Check className="w-3 h-3 mr-1"/> Ready</span> : 
-                                            <span className="text-gray-400">Missing</span>
-                                        }
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Exam Review Summary */}
-                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                        <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center border-b pb-2">
-                            <PenTool className="w-5 h-5 mr-2 text-brand-600" /> Entrance Test Status
-                        </h3>
-                        <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Questions Answered</span>
-                            <span className="text-sm font-bold text-gray-900">{getCompletedQuestionCount()} / {exams.length}</span>
-                        </div>
-                    </div>
-                  </div>
-                  
-                  {/* Signature Section */}
-                  <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mt-6">
-                      <h3 className="text-lg font-bold text-gray-900 mb-4">Electronic Signature</h3>
-                      
-                      <div className="mb-4">
-                          <label className="flex items-start cursor-pointer p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors border border-gray-200">
-                            <div className="flex items-center h-5 mt-1">
-                              <input 
-                                type="checkbox" 
-                                checked={eSignChecked} 
-                                onChange={e => setESignChecked(e.target.checked)}
-                                className="hidden" 
-                              />
-                              <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${eSignChecked ? 'bg-brand-600 border-brand-600' : 'bg-white border-gray-300'}`}>
-                                {eSignChecked && <Check className="w-3.5 h-3.5 text-white" />}
-                              </div>
-                            </div>
-                            <div className="ml-3">
-                              <span className="font-bold text-gray-900 block">Declaration</span>
-                              <p className="text-gray-500 text-sm mt-1">
-                                  I hereby certify that the information provided above is true and correct to the best of my knowledge. 
-                                  I understand that any false statement may result in the rejection of my application.
-                              </p>
-                            </div>
-                          </label>
-                      </div>
-
-                      {/* PDPA Consent Checkbox */}
-                      <div className="mb-4">
-                          <label className="flex items-start cursor-pointer p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors border border-gray-200">
-                              <div className="flex items-center h-5 mt-1">
-                                  <input 
-                                      type="checkbox" 
-                                      checked={pdpaChecked} 
-                                      onChange={e => setPdpaChecked(e.target.checked)}
-                                      className="hidden" 
-                                  />
-                                  <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${pdpaChecked ? 'bg-brand-600 border-brand-600' : 'bg-white border-gray-300'}`}>
-                                      {pdpaChecked && <Check className="w-3.5 h-3.5 text-white" />}
-                                  </div>
-                              </div>
-                              <div className="ml-3">
-                                  <span className="font-bold text-gray-900 block">PDPA Consent</span>
-                                  <p className="text-gray-500 text-sm mt-1">
-                                      I agree to the collection and use of my personal data.
-                                      <button 
-                                          type="button"
-                                          onClick={(e) => { e.preventDefault(); setIsPdpaModalOpen(true); }}
-                                          className="text-brand-600 hover:underline ml-1 font-medium"
-                                      >
-                                          Read Terms & Conditions
-                                      </button>
-                                  </p>
-                              </div>
-                          </label>
-                      </div>
-
-                      <div className="border-t border-gray-100 pt-4">
-                          <div className="flex flex-col md:flex-row gap-6">
-                              <div className="flex-1">
-                                  <label className="block text-sm font-bold text-gray-700 mb-2">Draw Signature</label>
-                                  <div className="border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 touch-none relative" style={{ height: '200px' }}>
-                                      <canvas 
-                                          ref={canvasRef} 
-                                          width={400} 
-                                          height={200}
-                                          className="w-full h-full cursor-crosshair rounded-lg"
-                                          onMouseDown={startDrawing}
-                                          onMouseMove={draw}
-                                          onMouseUp={endDrawing}
-                                          onMouseLeave={endDrawing}
-                                          onTouchStart={startDrawing}
-                                          onTouchMove={draw}
-                                          onTouchEnd={endDrawing}
-                                      />
-                                      {!signatureImage && <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-gray-400 text-sm">Sign here</div>}
-                                  </div>
-                                  <div className="mt-2 flex justify-end">
-                                      <button onClick={clearSignature} className="text-xs text-red-500 hover:underline">Clear</button>
-                                  </div>
-                              </div>
-                              
-                              <div className="flex items-center justify-center text-gray-400 font-bold text-sm">OR</div>
-
-                              <div className="flex-1">
-                                  <label className="block text-sm font-bold text-gray-700 mb-2">Upload Signature Image</label>
-                                  <div className="border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 h-[200px] flex flex-col items-center justify-center relative hover:bg-gray-100 transition-colors">
-                                      {signatureImage ? (
-                                          <img src={signatureImage} alt="Signature" className="max-h-full max-w-full p-2" />
-                                      ) : (
-                                          <>
-                                              <ImageIcon className="w-8 h-8 text-gray-400 mb-2" />
-                                              <span className="text-xs text-gray-500">Click to upload</span>
-                                          </>
-                                      )}
-                                      <input type="file" accept="image/*" onChange={handleSignatureUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
-                                  </div>
-                              </div>
-                          </div>
-                      </div>
-                  </div>
-
-                   <div className="mt-8 flex justify-end">
-                    <Button onClick={() => setActiveSubSection('payment')} disabled={!eSignChecked || !signatureImage || !pdpaChecked}>
-                        {isEditRestricted ? 'Continue to Resubmit' : 'Continue to Payment'}
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* 5. Payment */}
-              {activeSubSection === 'payment' && (
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                    5. Application Fee Payment
-                  </h2>
-                  {renderPaymentUI(
-                      handleApplicationFeePayment, 
-                      500, 
-                      isEditRestricted ? 'Resubmit Application' : 'Open K-Plus App', 
-                      'Application Fee'
-                  )}
-                </div>
-              )}
+              {activeSubSection === 'profile' && (<div><div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold text-gray-900">1. Personal Information</h2></div><div className="grid grid-cols-1 md:grid-cols-2 gap-6">{fieldConfigs.filter(f => !f.isHidden).map(field => renderField(field))}</div><div className="mt-8 flex justify-end"><Button onClick={handleProfileSave}>Save & Next</Button></div></div>)}
+              {activeSubSection === 'docs' && (<div><h2 className="text-2xl font-bold text-gray-900 mb-6">2. Document Upload</h2>{isEditRestricted && (<div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-lg mb-6 flex items-start animate-fade-in"><AlertTriangle className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" /><div><p className="font-bold">Application Returned</p><p className="text-sm">Please correct the rejected documents below. Other fields are locked.</p></div></div>)}{(Object.values(formData.documents) as DocumentItem[]).filter(d => d.configId === 'doc_conf_pic').map(doc => (<div key={doc.id} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mb-6 flex flex-col md:flex-row items-center gap-6"><div className="w-32 h-32 flex-shrink-0">{doc.status === DocumentStatus.UPLOADED || doc.status === DocumentStatus.APPROVED ? (<img src={doc.fileUrl || `https://ui-avatars.com/api/?name=${formData.fullName.replace(" ", "+")}`} alt="Profile" className="w-full h-full rounded-full object-cover border-4 border-gray-100 shadow-sm" />) : (<div className="w-full h-full rounded-full bg-gray-100 flex items-center justify-center border-4 border-gray-50 text-gray-400"><User className="w-12 h-12" /></div>)}</div><div className="flex-1 text-center md:text-left"><h3 className="font-bold text-lg text-gray-900">Profile Picture</h3><p className="text-sm text-gray-500 mb-3">Upload a clear photo of yourself.</p>{isCropOpen && originalImage && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4"><div className="bg-white rounded-xl overflow-hidden shadow-2xl max-w-lg w-full flex flex-col"><div className="p-4 border-b border-gray-100 flex justify-between items-center"><h3 className="font-bold text-gray-800">Adjust Photo</h3><button onClick={() => setIsCropOpen(false)}><X className="w-5 h-5 text-gray-500"/></button></div><div className="relative h-80 bg-gray-900 overflow-hidden cursor-move touch-none flex items-center justify-center" onMouseDown={handleCropMouseDown} onMouseMove={handleCropMouseMove} onMouseUp={handleCropMouseUp} onMouseLeave={handleCropMouseUp} onTouchStart={handleCropMouseDown} onTouchMove={handleCropMouseMove} onTouchEnd={handleCropMouseUp}><img ref={cropImgRef} src={originalImage} alt="Crop" style={{ transform: `scale(${cropScale}) translate(${cropPos.x}px, ${cropPos.y}px)`, transition: isDraggingCrop ? 'none' : 'transform 0.1s' }} className="max-w-none" draggable={false}/><div className="absolute inset-0 pointer-events-none border-2 border-white opacity-50 rounded-full w-64 h-64 m-auto shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]"></div></div><div className="p-4 bg-white border-t border-gray-100"><div className="flex items-center gap-4 mb-4"><ZoomOut className="w-4 h-4 text-gray-400"/><input type="range" min="0.5" max="3" step="0.1" value={cropScale} onChange={(e) => setCropScale(parseFloat(e.target.value))} className="flex-1" /><ZoomIn className="w-4 h-4 text-gray-400"/></div><Button className="w-full" onClick={handleCropSave}>Save Photo</Button></div></div></div>)}<div className="relative inline-block"><input type="file" accept="image/*" onChange={handleProfilePicSelect} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" /><Button variant="outline" size="sm" className="relative z-10 pointer-events-none"><ImageIcon className="w-4 h-4 mr-2"/> {doc.status === 'uploaded' ? 'Change Photo' : 'Upload Photo'}</Button></div></div></div>))}<div className="space-y-4">{(Object.values(formData.documents) as DocumentItem[]).filter(d => d.configId !== 'doc_conf_pic').sort((a,b) => { const confA = docConfigs.find(c => c.id === a.configId); const confB = docConfigs.find(c => c.id === b.configId); return (confA?.order || 99) - (confB?.order || 99); }).map((doc: DocumentItem) => { const isRejected = doc.status === DocumentStatus.REJECTED; const canEdit = !isEditRestricted || isRejected; const docConfig = docConfigs.find(c => c.id === doc.configId); const isRequired = docConfig ? docConfig.isRequired : true; return (<div key={doc.id} className={`border rounded-lg p-4 bg-white hover:bg-gray-50 transition-colors ${isRejected ? 'border-red-300 ring-1 ring-red-200' : 'border-gray-200'}`}><div className="flex items-center justify-between mb-2"><div className="flex items-center">{doc.status === DocumentStatus.UPLOADED || doc.status === DocumentStatus.APPROVED ? <CheckCircle className="text-green-500 mr-3 h-6 w-6" /> : doc.status === DocumentStatus.REJECTED ? <X className="text-red-500 mr-3 h-6 w-6" /> : <div className="w-6 h-6 border-2 border-gray-300 rounded-full mr-3"></div>}<div><h4 className="font-semibold text-gray-900 flex items-center">{doc.name} {isRequired ? <span className="text-red-500 ml-1">*</span> : <span className="text-xs text-gray-400 ml-2 font-normal">(Optional)</span>}</h4>{doc.reviewNote && <p className="text-xs text-red-600 font-bold mt-1">Note: {doc.reviewNote}</p>}{!doc.fileName && <p className="text-xs text-gray-400 mt-0.5">No file uploaded</p>}</div></div>{canEdit && (<label className="cursor-pointer"><input type="file" className="hidden" onChange={() => handleFileUpload(doc.id)} /><span className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-100"><Upload className="w-4 h-4 mr-2" /> {doc.status === 'pending' || !doc.fileName ? 'Upload' : 'Re-upload'}</span></label>)}</div>{doc.fileName && (<div className="flex items-center justify-between bg-gray-100 rounded px-3 py-2 ml-9"><div className="flex items-center text-sm text-gray-600 truncate"><FileText className="w-4 h-4 mr-2 flex-shrink-0" /><span className="truncate">{doc.fileName}</span></div>{canEdit && doc.status === DocumentStatus.UPLOADED && (<button onClick={() => handleFileDelete(doc.id)} className="text-gray-400 hover:text-red-500 ml-2" title="Remove file"><Trash2 className="w-4 h-4" /></button>)}</div>)}</div>); })}</div><div className="mt-8 flex justify-between"><Button variant="outline" onClick={() => setActiveSubSection('profile')}>Back</Button><Button onClick={handleDocsNext}>Save & Next</Button></div></div>)}
+              {activeSubSection === 'test' && (<div>{!selectedSuiteId ? (<div><h2 className="text-2xl font-bold text-gray-900 mb-2">3. Entrance Test Suites</h2><p className="text-gray-500 mb-6">Please complete all test suites below.</p><div className="grid grid-cols-1 md:grid-cols-2 gap-6">{examSuites.map(suite => { const progress = calculateSuiteProgress(suite.id); const isDone = progress.total > 0 && progress.current === progress.total; return (<div key={suite.id} className={`border-2 rounded-xl p-6 flex flex-col justify-between transition-all ${isDone ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-white hover:border-brand-300 hover:shadow-md'}`}><div><div className="flex justify-between items-start mb-3"><h3 className="text-lg font-bold text-gray-900">{suite.title}</h3>{isDone && <CheckCircle className="text-green-600 w-6 h-6" />}</div><p className="text-sm text-gray-500 mb-4">{suite.description}</p></div><div><div className="flex justify-between text-xs font-semibold text-gray-600 mb-1"><span>Progress</span><span>{progress.current} / {progress.total} items</span></div><div className="w-full bg-gray-200 rounded-full h-2.5 mb-4"><div className={`h-2.5 rounded-full ${isDone ? 'bg-green-500' : 'bg-brand-500'}`} style={{ width: `${progress.percentage}%` }}></div></div><Button variant={isDone ? "outline" : "primary"} className="w-full justify-center" onClick={() => setSelectedSuiteId(suite.id)}>{isDone ? 'Review Answers' : progress.current > 0 ? 'Continue Test' : 'Start Test'}</Button></div></div>); })}</div><div className="mt-8 flex justify-between"><Button variant="outline" onClick={() => setActiveSubSection('docs')}>Back</Button><Button disabled={!isExamComplete()} onClick={() => setActiveSubSection('esign')} className={isExamComplete() ? 'animate-pulse' : ''}>Save & Next</Button></div></div>) : (<div><div className="flex items-center mb-6"><button onClick={handleSuiteReturn} className="mr-4 text-gray-500 hover:text-gray-700 p-2 rounded-full hover:bg-gray-100"><ChevronLeft className="w-6 h-6" /></button><div><h2 className="text-xl font-bold text-gray-900">{examSuites.find(s => s.id === selectedSuiteId)?.title}</h2><p className="text-sm text-gray-500">Your answers are saved automatically.</p></div></div><div className="space-y-8 mb-8">{exams.filter(e => e.suiteId === selectedSuiteId).map((q, idx) => { const currentAnswer = formData.examAnswers?.[q.id]; return (<div key={q.id} className="bg-white p-6 border border-gray-200 rounded-lg shadow-sm"><h4 className="text-base font-semibold text-gray-900 mb-4 flex items-start"><span className="mr-2 text-gray-900 font-bold">Q{idx + 1}.</span> <div className="flex-1">{q.text} {q.score > 0 && <span className="text-xs text-gray-400 font-normal ml-2">(Score: {q.score})</span>}</div></h4>{q.type === QuestionType.MCQ_SINGLE && (<div className="space-y-2 pl-4">{q.options?.map(opt => (<div key={opt.id}><label className={`flex items-center p-3 border rounded-md cursor-pointer transition-all duration-200 ${isEditRestricted ? 'cursor-not-allowed opacity-70 bg-gray-50' : ''} ${currentAnswer === opt.id ? 'border-brand-600 ring-1 ring-brand-600 bg-brand-50' : 'border-gray-300 bg-white hover:bg-gray-50'}`}><input type="radio" name={q.id} className="hidden" checked={currentAnswer === opt.id} onChange={() => !isEditRestricted && handleExamAnswerChange(q.id, opt.id)} disabled={isEditRestricted}/><div className={`flex-shrink-0 w-5 h-5 rounded-full border flex items-center justify-center mr-3 transition-colors ${currentAnswer === opt.id ? 'border-brand-600' : 'border-gray-300 bg-white'}`}>{currentAnswer === opt.id && <div className="w-2.5 h-2.5 rounded-full bg-brand-600" />}</div><span className="text-sm font-medium text-gray-900">{opt.text}</span></label>{opt.allowInput && currentAnswer === opt.id && (<input type="text" className="mt-2 w-full border rounded p-2 text-sm ml-8" placeholder="Please specify..." value={formData.customData?.[`exam_other_${q.id}`] || ''} onChange={(e) => handleCustomDataChange(`exam_other_${q.id}`, e.target.value)} disabled={isEditRestricted}/>)}</div>))}</div>)}{q.type === QuestionType.MCQ_MULTI && (<div className="space-y-2 pl-4">{q.options?.map(opt => { const selectedList = Array.isArray(currentAnswer) ? currentAnswer : []; const isSelected = selectedList.includes(opt.id); return (<label key={opt.id} className={`flex items-center p-3 border rounded-md cursor-pointer transition-all duration-200 ${isEditRestricted ? 'cursor-not-allowed opacity-70 bg-gray-50' : ''} ${isSelected ? 'border-brand-600 ring-1 ring-brand-600 bg-brand-50' : 'border-gray-300 bg-white hover:bg-gray-50'}`}><input type="checkbox" className="hidden" checked={isSelected} onChange={(e) => { if(isEditRestricted) return; let newList = [...selectedList]; if(e.target.checked) newList.push(opt.id); else newList = newList.filter(id => id !== opt.id); handleExamAnswerChange(q.id, newList); }} disabled={isEditRestricted} /> <div className={`flex-shrink-0 w-5 h-5 rounded border flex items-center justify-center mr-3 transition-colors ${isSelected ? 'bg-brand-600 border-brand-600' : 'bg-white border-gray-300'}`}>{isSelected && <Check className="w-3.5 h-3.5 text-white" />}</div><span className="text-sm font-medium text-gray-900">{opt.text}</span></label>); })}</div>)}{q.type === QuestionType.ESSAY && (<div className="pl-4"><textarea rows={4} className="w-full border border-gray-300 rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 focus:border-brand-600 bg-white shadow-sm text-gray-900 placeholder-gray-400 disabled:bg-gray-100 disabled:text-gray-500" placeholder="Type your answer here..." value={typeof currentAnswer === 'string' ? currentAnswer : ''} onChange={(e) => handleExamAnswerChange(q.id, e.target.value)} disabled={isEditRestricted}/></div>)}</div>); })}</div><div className="flex justify-end"><Button onClick={handleSuiteReturn} className="flex items-center">Save & Return <ArrowRight className="ml-2 w-4 h-4" /></Button></div></div>)}</div>)}
+              {activeSubSection === 'esign' && (<div><h2 className="text-2xl font-bold text-gray-900 mb-6">4. Review & E-Sign</h2>{isEditRestricted && (<div className="bg-brand-50 border border-brand-200 p-4 rounded-lg mb-6 text-brand-700 text-sm font-medium flex items-center"><RefreshCw className="w-5 h-5 mr-2" />Status: Resubmission (Correcting Rejected Documents)</div>)}<div className="space-y-6 mb-8"><div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm"><h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center border-b pb-2"><User className="w-5 h-5 mr-2 text-brand-600" /> Personal Information</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">{fieldConfigs.filter(f => !f.isHidden).map(f => renderReadOnlyField(f))}</div></div><div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm"><h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center border-b pb-2"><Upload className="w-5 h-5 mr-2 text-brand-600" /> Documents Submitted</h3><div className="space-y-3">{(Object.values(formData.documents) as DocumentItem[]).sort((a,b) => { const confA = docConfigs.find(c => c.id === a.configId); const confB = docConfigs.find(c => c.id === b.configId); return (confA?.order || 99) - (confB?.order || 99); }).map((doc: DocumentItem) => (<div key={doc.id} className="flex items-center justify-between bg-gray-50 p-3 rounded border border-gray-100"><div className="flex items-center"><div className={`p-1.5 rounded-full mr-3 ${doc.status === DocumentStatus.UPLOADED || doc.status === DocumentStatus.APPROVED ? 'bg-green-100' : 'bg-gray-200'}`}><FileText className={`w-4 h-4 ${doc.status === DocumentStatus.UPLOADED || doc.status === DocumentStatus.APPROVED ? 'text-green-600' : 'text-gray-500'}`} /></div><div><div className="text-sm font-medium text-gray-900">{doc.name}</div>{doc.fileName && <div className="text-xs text-gray-500">{doc.fileName}</div>}</div></div><div className="text-xs font-bold">{doc.status === DocumentStatus.UPLOADED || doc.status === DocumentStatus.APPROVED ? <span className="text-green-600 flex items-center"><Check className="w-3 h-3 mr-1"/> Ready</span> : <span className="text-gray-400">Missing</span>}</div></div>))}</div></div><div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm"><h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center border-b pb-2"><PenTool className="w-5 h-5 mr-2 text-brand-600" /> Entrance Test Status</h3><div className="flex items-center justify-between"><span className="text-sm text-gray-600">Questions Answered</span><span className="text-sm font-bold text-gray-900">{getCompletedQuestionCount()} / {exams.length}</span></div></div></div><div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mt-6"><h3 className="text-lg font-bold text-gray-900 mb-4">Electronic Signature</h3><div className="mb-4"><label className="flex items-start cursor-pointer p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors border border-gray-200"><div className="flex items-center h-5 mt-1"><input type="checkbox" checked={eSignChecked} onChange={e => setESignChecked(e.target.checked)} className="hidden" /><div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${eSignChecked ? 'bg-brand-600 border-brand-600' : 'bg-white border-gray-300'}`}>{eSignChecked && <Check className="w-3.5 h-3.5 text-white" />}</div></div><div className="ml-3"><span className="font-bold text-gray-900 block">Declaration</span><p className="text-gray-500 text-sm mt-1">I hereby certify that the information provided above is true and correct to the best of my knowledge. I understand that any false statement may result in the rejection of my application.</p></div></label></div><div className="mb-4"><label className="flex items-start cursor-pointer p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors border border-gray-200"><div className="flex items-center h-5 mt-1"><input type="checkbox" checked={pdpaChecked} onChange={e => setPdpaChecked(e.target.checked)} className="hidden" /><div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${pdpaChecked ? 'bg-brand-600 border-brand-600' : 'bg-white border-gray-300'}`}>{pdpaChecked && <Check className="w-3.5 h-3.5 text-white" />}</div></div><div className="ml-3"><span className="font-bold text-gray-900 block">PDPA Consent</span><p className="text-gray-500 text-sm mt-1">I agree to the collection and use of my personal data.<button type="button" onClick={(e) => { e.preventDefault(); setIsPdpaModalOpen(true); }} className="text-brand-600 hover:underline ml-1 font-medium">Read Terms & Conditions</button></p></div></label></div><div className="border-t border-gray-100 pt-4"><div className="flex flex-col md:flex-row gap-6"><div className="flex-1"><label className="block text-sm font-bold text-gray-700 mb-2">Draw Signature</label><div className="border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 touch-none relative" style={{ height: '200px' }}><canvas ref={canvasRef} width={400} height={200} className="w-full h-full cursor-crosshair rounded-lg" onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={endDrawing} onMouseLeave={endDrawing} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={endDrawing}/>{!signatureImage && <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-gray-400 text-sm">Sign here</div>}</div><div className="mt-2 flex justify-end"><button onClick={clearSignature} className="text-xs text-red-500 hover:underline">Clear</button></div></div><div className="flex items-center justify-center text-gray-400 font-bold text-sm">OR</div><div className="flex-1"><label className="block text-sm font-bold text-gray-700 mb-2">Upload Signature Image</label><div className="border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 h-[200px] flex flex-col items-center justify-center relative hover:bg-gray-100 transition-colors">{signatureImage ? (<img src={signatureImage} alt="Signature" className="max-h-full max-w-full p-2" />) : (<><ImageIcon className="w-8 h-8 text-gray-400 mb-2" /><span className="text-xs text-gray-500">Click to upload</span></>)}<input type="file" accept="image/*" onChange={handleSignatureUpload} className="absolute inset-0 opacity-0 cursor-pointer" /></div></div></div></div></div><div className="mt-8 flex justify-end"><Button onClick={() => setActiveSubSection('payment')} disabled={!eSignChecked || !signatureImage || !pdpaChecked}>{isEditRestricted ? 'Continue to Resubmit' : 'Continue to Payment'}</Button></div></div>)}
+              {activeSubSection === 'payment' && (<div><h2 className="text-2xl font-bold text-gray-900 mb-6">5. Application Fee Payment</h2>{renderPaymentUI(handleApplicationFeePayment, 500, isEditRestricted ? 'Resubmit Application' : 'Open K-Plus App', 'Application Fee')}</div>)}
             </div>
           </div>
         )}
 
-        {/* STEP 2: ตรวจสอบเอกสาร (Verification) */}
         {activeSubSection !== 'my_purchases' && currentStep === 2 && (
-          <div className="grid grid-cols-1 gap-8 min-h-[500px]">
-            {/* Application Summary (Read Only) - Full Width now */}
-            <div className="bg-white rounded-xl shadow-lg p-8 border border-gray-200">
-               {displayStatus === ApplicationStatus.DOCS_REJECTED ? (
-                 <div className="text-center mb-8 animate-fade-in">
-                    <div className="w-24 h-24 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-6 mx-auto">
-                        <X className="w-12 h-12" />
-                    </div>
-                    <h2 className="text-3xl font-bold text-red-700 mb-2">Documents Returned</h2>
-                    <p className="text-lg text-gray-600 mb-6">
-                        One or more documents have been rejected by our staff. Please correct them to proceed.
-                    </p>
-                    <Button size="lg" onClick={handleFixApplication} className="bg-red-600 hover:bg-red-700 text-white">
-                        Fix Application
-                    </Button>
-                 </div>
-               ) : (
-                 <>
-                    <div className="text-center mb-12 animate-fade-in py-8">
-                        <div className="w-24 h-24 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center mb-6 mx-auto">
-                            <Clock className="w-12 h-12" />
-                        </div>
-                        <h2 className="text-3xl font-bold text-gray-900 mb-4">Verification In Progress</h2>
-                        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-                            Your application is under review by our staff. Please check back later.
-                        </p>
-                    </div>
-                 </>
-               )}
-
-               {/* Full Read-Only Summary */}
-               <div className="space-y-8">
-                 <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                    <div className="flex justify-between items-center p-4 bg-gray-50 border-b border-gray-200">
-                        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center">
-                            <User className="w-4 h-4 mr-2"/> Applicant Information
-                        </h3>
-                        {(() => {
-                            const hasFieldRejections = Object.keys(formData.fieldRejections || {}).length > 0;
-                            if (displayStatus === ApplicationStatus.DOCS_REJECTED && hasFieldRejections) {
-                                return <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full font-bold flex items-center"><AlertTriangle className="w-3 h-3 mr-1"/> Action Required</span>;
-                            } else if ([ApplicationStatus.DOCS_APPROVED, ApplicationStatus.INTERVIEW_READY, ApplicationStatus.INTERVIEW_BOOKED, ApplicationStatus.PASSED, ApplicationStatus.ENROLLED].includes(displayStatus)) {
-                                return <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-bold flex items-center"><Check className="w-3 h-3 mr-1"/> Verified</span>;
-                            } else {
-                                return <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-bold">Pending Review</span>;
-                            }
-                        })()}
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm p-6">
-                        {fieldConfigs.filter(f => !f.isHidden).map(f => renderReadOnlyField(f))}
-                    </div>
-                 </div>
-
-                 <div>
-                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3 border-b border-gray-100 pb-2">Documents & Evidence</h3>
-                    <div className="space-y-3">
-                      {(Object.values(formData.documents) as DocumentItem[]).sort((a,b) => {
-                          const confA = docConfigs.find(c => c.id === a.configId);
-                          const confB = docConfigs.find(c => c.id === b.configId);
-                          return (confA?.order || 99) - (confB?.order || 99);
-                      }).map((doc: DocumentItem) => {
-                        let badge = <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-bold">Pending Review</span>;
-                        if (displayStatus === ApplicationStatus.DOCS_REJECTED) {
-                           if (doc.status === DocumentStatus.REJECTED) {
-                               badge = <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full font-bold flex items-center"><AlertTriangle className="w-3 h-3 mr-1"/> Action Required</span>;
-                           } else if (doc.status === DocumentStatus.APPROVED || doc.status === DocumentStatus.UPLOADED) {
-                               badge = <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-bold flex items-center"><Check className="w-3 h-3 mr-1"/> Passed</span>;
-                           }
-                        } else if (displayStatus === ApplicationStatus.SUBMITTED) {
-                            if (doc.status === DocumentStatus.APPROVED) {
-                                badge = <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-bold">Verified</span>;
-                            } else if (doc.status === DocumentStatus.UPLOADED) {
-                                badge = <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-bold">Uploaded</span>;
-                            }
-                        }
-                        
-                        return (
-                            <div key={doc.id} className={`flex items-center justify-between p-3 rounded border ${doc.status === DocumentStatus.REJECTED ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}>
-                                <div className="flex items-center">
-                                    <FileText className={`w-5 h-5 mr-3 ${doc.status === DocumentStatus.REJECTED ? 'text-red-500' : 'text-gray-400'}`}/>
-                                    <div>
-                                        <span className="text-sm font-medium text-gray-900 block">{doc.name}</span>
-                                        {doc.reviewNote && <span className="text-xs text-red-600 font-bold block mt-0.5">{doc.reviewNote}</span>}
-                                    </div>
-                                </div>
-                                {badge}
-                            </div>
-                        );
-                      })}
-                    </div>
-                 </div>
-
-                 {/* Payment Info */}
-                 <div>
-                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3 border-b border-gray-100 pb-2">Payment Status</h3>
-                    <div className="flex items-center p-4 bg-green-50 rounded-lg border border-green-100">
-                        <div className="bg-green-100 p-2 rounded-full mr-4">
-                            <CheckCircle className="w-6 h-6 text-green-600" />
-                        </div>
-                        <div>
-                            <div className="text-sm font-bold text-gray-900">Application Fee (500 THB)</div>
-                            <div className="text-xs text-green-700 font-medium flex items-center mt-1">
-                                Payment Verified
-                            </div>
-                        </div>
-                    </div>
-                 </div>
-
-               </div>
-            </div>
-          </div>
+          <div className="grid grid-cols-1 gap-8 min-h-[500px]"><div className="bg-white rounded-xl shadow-lg p-8 border border-gray-200">{displayStatus === ApplicationStatus.DOCS_REJECTED ? (<div className="text-center mb-8 animate-fade-in"><div className="w-24 h-24 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-6 mx-auto"><X className="w-12 h-12" /></div><h2 className="text-3xl font-bold text-red-700 mb-2">Documents Returned</h2><p className="text-lg text-gray-600 mb-6">One or more documents have been rejected by our staff. Please correct them to proceed.</p><Button size="lg" onClick={handleFixApplication} className="bg-red-600 hover:bg-red-700 text-white">Fix Application</Button></div>) : (<><div className="text-center mb-12 animate-fade-in py-8"><div className="w-24 h-24 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center mb-6 mx-auto"><Clock className="w-12 h-12" /></div><h2 className="text-3xl font-bold text-gray-900 mb-4">Verification In Progress</h2><p className="text-xl text-gray-600 max-w-2xl mx-auto">Your application is under review by our staff. Please check back later.</p></div></>)}<div className="space-y-8"><div className="bg-white border border-gray-200 rounded-lg overflow-hidden"><div className="flex justify-between items-center p-4 bg-gray-50 border-b border-gray-200"><h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center"><User className="w-4 h-4 mr-2"/> Applicant Information</h3>{(() => { const hasFieldRejections = Object.keys(formData.fieldRejections || {}).length > 0; if (displayStatus === ApplicationStatus.DOCS_REJECTED && hasFieldRejections) { return <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full font-bold flex items-center"><AlertTriangle className="w-3 h-3 mr-1"/> Action Required</span>; } else if ([ApplicationStatus.DOCS_APPROVED, ApplicationStatus.INTERVIEW_READY, ApplicationStatus.INTERVIEW_BOOKED, ApplicationStatus.PASSED, ApplicationStatus.ENROLLED].includes(displayStatus)) { return <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-bold flex items-center"><Check className="w-3 h-3 mr-1"/> Verified</span>; } else { return <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-bold">Pending Review</span>; } })()}</div><div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm p-6">{fieldConfigs.filter(f => !f.isHidden).map(f => renderReadOnlyField(f))}</div></div><div><h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3 border-b border-gray-100 pb-2">Documents & Evidence</h3><div className="space-y-3">{(Object.values(formData.documents) as DocumentItem[]).sort((a,b) => { const confA = docConfigs.find(c => c.id === a.configId); const confB = docConfigs.find(c => c.id === b.configId); return (confA?.order || 99) - (confB?.order || 99); }).map((doc: DocumentItem) => { let badge = <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-bold">Pending Review</span>; if (displayStatus === ApplicationStatus.DOCS_REJECTED) { if (doc.status === DocumentStatus.REJECTED) { badge = <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full font-bold flex items-center"><AlertTriangle className="w-3 h-3 mr-1"/> Action Required</span>; } else if (doc.status === DocumentStatus.APPROVED || doc.status === DocumentStatus.UPLOADED) { badge = <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-bold flex items-center"><Check className="w-3 h-3 mr-1"/> Passed</span>; } } else if (displayStatus === ApplicationStatus.SUBMITTED) { if (doc.status === DocumentStatus.APPROVED) { badge = <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-bold">Verified</span>; } else if (doc.status === DocumentStatus.UPLOADED) { badge = <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-bold">Uploaded</span>; } } return (<div key={doc.id} className={`flex items-center justify-between p-3 rounded border ${doc.status === DocumentStatus.REJECTED ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}><div className="flex items-center"><FileText className={`w-5 h-5 mr-3 ${doc.status === DocumentStatus.REJECTED ? 'text-red-500' : 'text-gray-400'}`}/><div><span className="text-sm font-medium text-gray-900 block">{doc.name}</span>{doc.reviewNote && <span className="text-xs text-red-600 font-bold block mt-0.5">{doc.reviewNote}</span>}</div></div>{badge}</div>); })}</div></div><div><h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3 border-b border-gray-100 pb-2">Payment Status</h3><div className="flex items-center p-4 bg-green-50 rounded-lg border border-green-100"><div className="bg-green-100 p-2 rounded-full mr-4"><CheckCircle className="w-6 h-6 text-green-600" /></div><div><div className="text-sm font-bold text-gray-900">Application Fee (500 THB)</div><div className="text-xs text-green-700 font-medium flex items-center mt-1">Payment Verified</div></div></div></div></div></div></div>
         )}
 
-        {/* STEP 3: นัดสัมภาษณ์ (Interview) */}
+        {/* STEP 3: Interview (Redesigned Flow) */}
         {activeSubSection !== 'my_purchases' && currentStep === 3 && (
           <div className="bg-white rounded-xl shadow-lg p-8 min-h-[500px] flex flex-col">
-             {/* SUB-STATE 1: Screening Passed (Pay Fee) */}
-             {displayStatus === ApplicationStatus.DOCS_APPROVED && (
-               <div className="max-w-3xl mx-auto text-center flex-1 flex flex-col justify-center w-full">
-                  <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6 mx-auto">
-                    <CheckCircle className="w-10 h-10" />
+             
+             {/* Phase 1: Screening Result & Declaration */}
+             {displayStatus === ApplicationStatus.DOCS_APPROVED && !hasAcknowledgedScreening && (
+                <div className="max-w-3xl mx-auto w-full animate-fade-in py-8">
+                    <div className="text-center mb-10">
+                        <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6 mx-auto shadow-inner">
+                            <CheckCircle className="w-12 h-12" />
+                        </div>
+                        <h2 className="text-4xl font-extrabold text-gray-900 mb-4">You Passed the Screening!</h2>
+                        <p className="text-lg text-gray-600 leading-relaxed">
+                            Congratulations. Your initial application and documents have been verified by our staff. 
+                            You are now eligible to schedule your written examination and interview.
+                        </p>
+                    </div>
+
+                    <div className="bg-brand-50 border border-brand-200 rounded-2xl p-8 mb-10 shadow-sm">
+                        <h3 className="text-xl font-bold text-brand-900 mb-4 flex items-center">
+                            <Shield className="w-6 h-6 mr-2 text-brand-600" /> Acknowledgment & Declaration
+                        </h3>
+                        <div className="text-brand-800 text-sm mb-6 leading-relaxed">
+                            Before proceeding to slot selection, please confirm that you understand the following:
+                            <ul className="list-disc ml-5 mt-2 space-y-2">
+                                <li>You must select one slot for the Written Exam and one slot for the Interview.</li>
+                                <li>The selected slots must not overlap in time.</li>
+                                <li>An interview fee of <strong>200 THB</strong> is required to finalize your booking.</li>
+                                <li>Once paid and confirmed, slots can only be changed by contacting the admissions office directly.</li>
+                            </ul>
+                        </div>
+                        
+                        <label className="flex items-start cursor-pointer p-4 bg-white rounded-xl border border-brand-200 hover:border-brand-500 transition-colors shadow-sm">
+                            <div className="flex items-center h-6 mt-0.5">
+                                <input 
+                                    type="checkbox" 
+                                    checked={interviewDeclarationChecked} 
+                                    onChange={e => setInterviewDeclarationChecked(e.target.checked)} 
+                                    className="hidden" 
+                                />
+                                <div className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${interviewDeclarationChecked ? 'bg-brand-600 border-brand-600 text-white' : 'bg-white border-gray-300'}`}>
+                                    {interviewDeclarationChecked && <Check className="w-4 h-4" />}
+                                </div>
+                            </div>
+                            <div className="ml-4">
+                                <span className="font-bold text-gray-900 block">I acknowledge my screening result</span>
+                                <p className="text-gray-500 text-xs mt-1">I understand the process and wish to proceed to scheduling.</p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div className="flex justify-center">
+                        <Button 
+                            size="lg" 
+                            disabled={!interviewDeclarationChecked} 
+                            onClick={() => setHasAcknowledgedScreening(true)}
+                            className="px-12 py-6 text-xl shadow-lg shadow-brand-200 flex items-center gap-3"
+                        >
+                            Continue to Scheduling <ArrowRight className="w-6 h-6" />
+                        </Button>
+                    </div>
+                </div>
+             )}
+
+             {/* Phase 2: Dual Slot Selection (Only if Declared) */}
+             {displayStatus === ApplicationStatus.DOCS_APPROVED && hasAcknowledgedScreening && !isSlotConfirmed && (
+               <div className="animate-fade-in">
+                  <button onClick={() => setHasAcknowledgedScreening(false)} className="mb-6 flex items-center text-gray-500 font-medium hover:text-brand-600 transition-colors">
+                      <ChevronLeft className="w-4 h-4 mr-1"/> Back to Result
+                  </button>
+
+                  <div className="max-w-3xl mx-auto text-center mb-10">
+                    <h2 className="text-3xl font-bold text-gray-900 mb-2">Schedule Your Sessions</h2>
+                    <p className="text-gray-600">Please select your preferred time slots for both the written exam and interview.</p>
                   </div>
-                  <h2 className="text-3xl font-bold text-gray-900 mb-4">You Passed the Screening!</h2>
-                  <p className="text-gray-600 mb-8">
-                    Congratulations. Your documents have been approved, and you are eligible for an interview.
-                    Please pay the interview fee to proceed with booking a slot.
+
+                  <div className="space-y-12 max-w-5xl mx-auto">
+                    {/* Section A: Written Exam Slot */}
+                    <div>
+                        <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                            <PenTool className="mr-2 text-brand-600" /> 1. Select Written Exam Slot
+                        </h3>
+                        {interviewSlots.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                {interviewSlots
+                                    .filter(s => s.booked < s.capacity)
+                                    .sort((a,b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime())
+                                    .map(slot => (
+                                    <button 
+                                        key={slot.id}
+                                        onClick={() => { setTempWrittenSlotId(slot.id); setIsSlotConfirmed(false); }}
+                                        className={`group p-6 border-2 rounded-xl transition-all text-left shadow-sm relative overflow-hidden flex flex-col justify-between h-full
+                                            ${tempWrittenSlotId === slot.id ? 'border-brand-600 bg-brand-50 ring-2 ring-brand-500 shadow-md' : 'border-gray-200 bg-white hover:border-brand-400 hover:bg-gray-50'}`}
+                                    >
+                                        {tempWrittenSlotId === slot.id && (
+                                            <div className="absolute top-0 right-0 bg-brand-600 text-white p-1 rounded-bl-lg">
+                                                <Check className="w-4 h-4" />
+                                            </div>
+                                        )}
+                                        <div>
+                                            <div className="text-xs font-bold text-brand-600 mb-1 uppercase">{slot.type}</div>
+                                            <div className="text-lg font-bold text-gray-900">{new Date(slot.dateTime).toLocaleDateString()}</div>
+                                            <div className="text-brand-600 font-medium mb-3">
+                                                {new Date(slot.dateTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {new Date(slot.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-gray-500 flex items-center mb-2"><MapPin className="w-3 h-3 mr-1"/> {slot.location}</div>
+                                            <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Seats: {slot.capacity - slot.booked} left</div>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-10 text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed">No slots available.</div>
+                        )}
+                    </div>
+
+                    {/* Section B: Interview Slot */}
+                    <div>
+                        <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                            <MessageSquare className="mr-2 text-brand-600" /> 2. Select Interview Slot
+                        </h3>
+                        {interviewSlots.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                {interviewSlots
+                                    .filter(s => s.booked < s.capacity)
+                                    .sort((a,b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime())
+                                    .map(slot => (
+                                    <button 
+                                        key={slot.id}
+                                        onClick={() => { setTempInterviewSlotId(slot.id); setIsSlotConfirmed(false); }}
+                                        className={`group p-6 border-2 rounded-xl transition-all text-left shadow-sm relative overflow-hidden flex flex-col justify-between h-full
+                                            ${tempInterviewSlotId === slot.id ? 'border-brand-600 bg-brand-50 ring-2 ring-brand-500 shadow-md' : 'border-gray-200 bg-white hover:border-brand-400 hover:bg-gray-50'}`}
+                                    >
+                                        {tempInterviewSlotId === slot.id && (
+                                            <div className="absolute top-0 right-0 bg-brand-600 text-white p-1 rounded-bl-lg">
+                                                <Check className="w-4 h-4" />
+                                            </div>
+                                        )}
+                                        <div>
+                                            <div className="text-xs font-bold text-brand-600 mb-1 uppercase">{slot.type}</div>
+                                            <div className="text-lg font-bold text-gray-900">{new Date(slot.dateTime).toLocaleDateString()}</div>
+                                            <div className="text-brand-600 font-medium mb-3">
+                                                {new Date(slot.dateTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {new Date(slot.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-gray-500 flex items-center mb-2"><MapPin className="w-3 h-3 mr-1"/> {slot.location}</div>
+                                            <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Seats: {slot.capacity - slot.booked} left</div>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-10 text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed">No slots available.</div>
+                        )}
+                    </div>
+                  </div>
+
+                  {/* Conflict Detection & Confirmation UI */}
+                  <div className="max-w-xl mx-auto mt-12 border-t pt-8">
+                     {tempWrittenSlotId && tempInterviewSlotId && isOverlap(tempWrittenSlotId, tempInterviewSlotId) ? (
+                         <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex items-start gap-3 animate-fade-in mb-6">
+                             <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0" />
+                             <div>
+                                 <p className="font-bold text-red-800">Time Conflict Detected!</p>
+                                 <p className="text-sm text-red-600">The selected written exam and interview times overlap. Please choose different slots that do not conflict.</p>
+                             </div>
+                         </div>
+                     ) : tempWrittenSlotId && tempInterviewSlotId && (
+                         <div className="bg-green-50 border border-green-200 p-4 rounded-xl flex items-center gap-3 animate-fade-in mb-6">
+                            <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
+                            <p className="text-sm text-green-800 font-medium">Slots selected successfully with no conflicts. Ready to confirm.</p>
+                         </div>
+                     )}
+
+                     <div className="flex justify-center">
+                        <Button 
+                            size="lg" 
+                            disabled={!tempWrittenSlotId || !tempInterviewSlotId || isOverlap(tempWrittenSlotId, tempInterviewSlotId)} 
+                            onClick={handleConfirmSlot}
+                            className="px-12 py-4 text-xl shadow-lg shadow-brand-200"
+                        >
+                            Confirm Selection
+                        </Button>
+                     </div>
+                  </div>
+               </div>
+             )}
+
+             {/* Phase 3: Slot Confirmed -> Proceed to Payment */}
+             {displayStatus === ApplicationStatus.DOCS_APPROVED && hasAcknowledgedScreening && isSlotConfirmed && tempInterviewSlotId && tempWrittenSlotId && (
+                <div className="max-w-3xl mx-auto w-full animate-fade-in">
+                    <button onClick={() => setIsSlotConfirmed(false)} className="mb-6 flex items-center text-gray-500 font-medium hover:text-brand-600 transition-colors">
+                        <ChevronLeft className="w-4 h-4 mr-1"/> Back to Selection
+                    </button>
+                    
+                    <div className="bg-brand-50 border border-brand-200 p-6 rounded-2xl mb-8">
+                        <h4 className="font-bold text-brand-900 text-lg mb-4 flex items-center border-b border-brand-100 pb-2">
+                           <CheckCircle className="w-5 h-5 mr-2 text-green-600"/> Booking Summary
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-1">
+                                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Written Exam</span>
+                                {(() => {
+                                    const s = interviewSlots.find(x => x.id === tempWrittenSlotId);
+                                    return s ? (
+                                        <p className="font-bold text-gray-800">
+                                            {new Date(s.dateTime).toLocaleDateString()} at {new Date(s.dateTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                                        </p>
+                                    ) : null;
+                                })()}
+                            </div>
+                            <div className="space-y-1">
+                                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Interview</span>
+                                {(() => {
+                                    const s = interviewSlots.find(x => x.id === tempInterviewSlotId);
+                                    return s ? (
+                                        <p className="font-bold text-gray-800">
+                                            {new Date(s.dateTime).toLocaleDateString()} at {new Date(s.dateTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                                        </p>
+                                    ) : null;
+                                })()}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="text-center mb-8">
+                        <p className="text-gray-600">Please complete the interview fee payment to finalize your schedule.</p>
+                    </div>
+
+                    {renderPaymentUI(handleInterviewFeePayment, 200, 'Pay Fee & Finalize', 'Interview Fee Payment')}
+                </div>
+             )}
+
+             {/* Final State: Booking Confirmed */}
+             {displayStatus === ApplicationStatus.INTERVIEW_BOOKED && (
+                <div className="flex flex-col items-center justify-center py-12 bg-gray-50 rounded-2xl border border-gray-200 animate-fade-in max-w-4xl mx-auto w-full">
+                  <div className="w-24 h-24 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center mb-6 shadow-md">
+                    <Calendar className="w-12 h-12" />
+                  </div>
+                  <h3 className="text-3xl font-bold text-gray-900">Appointments Booked!</h3>
+                  <p className="text-lg text-gray-600 mt-3 mb-8 text-center">
+                    Your written exam and interview have been successfully scheduled. <br/>
+                    Please arrive 15 minutes before each session begins.
                   </p>
                   
-                  {/* Full Payment UI for Interview Fee */}
-                  <div className="w-full text-left">
-                     {renderPaymentUI(handleInterviewFeePayment, 200, 'Pay Interview Fee', 'Interview Fee')}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-3xl mb-10">
+                     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                        <h4 className="font-bold text-brand-600 mb-4 border-b pb-2 flex items-center">
+                           <PenTool className="w-4 h-4 mr-2"/> Written Exam
+                        </h4>
+                        <div className="space-y-3">
+                           <div className="flex justify-between">
+                              <span className="text-gray-400 text-xs uppercase font-bold">Date</span>
+                              <span className="text-sm font-bold text-gray-900">
+                                 {(() => {
+                                    const sId = formData.customData?.writtenSlotId;
+                                    const s = interviewSlots.find(x => x.id === sId);
+                                    return s ? new Date(s.dateTime).toLocaleDateString() : '-';
+                                 })()}
+                              </span>
+                           </div>
+                           <div className="flex justify-between">
+                              <span className="text-gray-400 text-xs uppercase font-bold">Time</span>
+                              <span className="text-sm font-bold text-gray-900">
+                                 {(() => {
+                                    const sId = formData.customData?.writtenSlotId;
+                                    const s = interviewSlots.find(x => x.id === sId);
+                                    return s ? new Date(s.dateTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '-';
+                                 })()}
+                              </span>
+                           </div>
+                        </div>
+                     </div>
+
+                     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                        <h4 className="font-bold text-brand-600 mb-4 border-b pb-2 flex items-center">
+                           <MessageSquare className="w-4 h-4 mr-2"/> Interview
+                        </h4>
+                        <div className="space-y-3">
+                           <div className="flex justify-between">
+                              <span className="text-gray-400 text-xs uppercase font-bold">Date</span>
+                              <span className="text-sm font-bold text-gray-900">{new Date(applicant.interviewSlot!).toLocaleDateString()}</span>
+                           </div>
+                           <div className="flex justify-between">
+                              <span className="text-gray-400 text-xs uppercase font-bold">Time</span>
+                              <span className="text-sm font-bold text-gray-900">{new Date(applicant.interviewSlot!).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                           </div>
+                        </div>
+                     </div>
                   </div>
-               </div>
-             )}
 
-             {/* SUB-STATE 2: Fee Paid (Select Slot) */}
-             {(displayStatus === ApplicationStatus.INTERVIEW_READY || displayStatus === ApplicationStatus.INTERVIEW_BOOKED) && (
-               <div>
-                 <div className="text-center mb-10">
-                    <h2 className="text-3xl font-bold text-gray-900 mb-2">Interview Appointment</h2>
-                    <p className="text-gray-600">Select your preferred time slot for the interview.</p>
-                 </div>
-
-                 {displayStatus === ApplicationStatus.INTERVIEW_BOOKED ? (
-                    <div className="flex flex-col items-center justify-center py-12 bg-gray-50 rounded-xl border border-gray-200">
-                      <div className="w-20 h-20 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center mb-6">
-                        <Calendar className="w-10 h-10" />
-                      </div>
-                      <h3 className="text-2xl font-bold text-gray-900">Booking Confirmed</h3>
-                      <p className="text-lg text-gray-600 mt-2 mb-2">
-                        Date: <span className="font-bold text-brand-600">{new Date(applicant.interviewSlot!).toLocaleDateString()}</span>
-                      </p>
-                      <p className="text-lg text-gray-600 mb-8">
-                        Time: <span className="font-bold text-brand-600">{new Date(applicant.interviewSlot!).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                      </p>
-                      <Button variant="outline">Download Appointment Slip</Button>
-                    </div>
-                 ) : (
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
-                        <Clock className="mr-2 text-brand-600" /> Available Slots
-                      </h3>
-                      {interviewSlots.length > 0 ? (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                            {interviewSlots
-                                .filter(s => s.booked < s.capacity)
-                                .sort((a,b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime())
-                                .map(slot => (
-                                <button 
-                                  key={slot.id}
-                                  onClick={() => handleInterviewBook(slot.id)}
-                                  className="group p-6 border-2 border-gray-200 rounded-xl hover:border-brand-500 hover:bg-brand-50 transition-all bg-white text-left shadow-sm hover:shadow-md relative overflow-hidden"
-                                >
-                                  <div className="absolute top-0 right-0 bg-brand-100 text-brand-700 text-[10px] font-bold px-2 py-1 rounded-bl">
-                                      {slot.type}
-                                  </div>
-                                  <div className="text-lg font-bold text-gray-900 group-hover:text-brand-700">
-                                    {new Date(slot.dateTime).toLocaleDateString()}
-                                  </div>
-                                  <div className="text-brand-600 font-medium">
-                                    {new Date(slot.dateTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {new Date(slot.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                  </div>
-                                  <div className="mt-2 text-xs text-gray-500 flex items-center">
-                                      <MapPin className="w-3 h-3 mr-1"/> {slot.location}
-                                  </div>
-                                  <div className="mt-2 text-xs text-gray-400">
-                                      Seats: {slot.capacity - slot.booked} left
-                                  </div>
-                                </button>
-                            ))}
-                          </div>
-                      ) : (
-                          <div className="text-center py-10 text-gray-500 bg-gray-50 rounded-lg">
-                              No slots available at the moment. Please check back later.
-                          </div>
-                      )}
-                    </div>
-                 )}
-               </div>
-             )}
-          </div>
-        )}
-
-        {/* STEP 4: ประกาศผล (Result) */}
-        {activeSubSection !== 'my_purchases' && currentStep === 4 && (
-          <div className="bg-white rounded-xl shadow-lg p-8 min-h-[500px] flex flex-col items-center w-full">
-            {displayStatus === ApplicationStatus.PASSED && (
-              <div className="max-w-3xl mx-auto w-full flex flex-col items-center">
-                 <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6 animate-bounce">
-                    <CheckCircle className="w-12 h-12" />
-                 </div>
-                 <h2 className="text-4xl font-bold text-green-700 mb-4">Interview Passed!</h2>
-                 <p className="text-xl text-gray-700 max-w-2xl mx-auto mb-8 text-center">
-                    We are pleased to inform you that you have passed the interview selection. 
-                    To confirm your enrollment, please pay the tuition fee below.
-                 </p>
-                 
-                 {/* Tuition Payment UI */}
-                 <div className="w-full text-left">
-                    {renderPaymentUI(handleTuitionPayment, 15000, 'Pay Tuition Fee', 'Enrollment & Tuition Fee')}
-                 </div>
-              </div>
-            )}
-
-            {displayStatus === ApplicationStatus.ENROLLED && (
-                <div className="text-center max-w-2xl mx-auto pt-10">
-                     <div className="w-28 h-28 bg-brand-100 text-brand-700 rounded-full flex items-center justify-center mb-6 mx-auto shadow-lg border-4 border-brand-200">
-                        <GraduationCap className="w-16 h-16" />
-                     </div>
-                     <h2 className="text-4xl font-bold text-gray-900 mb-4">Welcome, Student!</h2>
-                     <p className="text-lg text-gray-600 mb-8">
-                        Your enrollment is confirmed. You are now officially a student at UniAdmit University.
-                        Please check your email for the orientation schedule.
-                     </p>
-                     <div className="bg-gray-100 p-6 rounded-lg border border-gray-300 inline-block text-left">
-                        <p className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-1">Student ID</p>
-                        <p className="text-2xl font-mono font-bold text-gray-900 tracking-widest">66010559</p>
-                     </div>
+                  <div className="flex gap-4">
+                    <Button variant="outline" className="flex items-center"><FileDown className="w-4 h-4 mr-2"/> Download Appointment Slip</Button>
+                    <Button variant="secondary" className="flex items-center"><Settings className="w-4 h-4 mr-2"/> Add to Calendar</Button>
+                  </div>
                 </div>
-            )}
-
-            {displayStatus === ApplicationStatus.FAILED && (
-              <div className="text-center pt-10">
-                 <div className="w-24 h-24 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-6 mx-auto">
-                    <X className="w-12 h-12" />
-                 </div>
-                 <h2 className="text-3xl font-bold text-red-700 mb-4">Application Status</h2>
-                 <p className="text-lg text-gray-600 max-w-lg mx-auto">
-                    We regret to inform you that your application was not successful this time. 
-                    Thank you for your interest in our university.
-                 </p>
-                 <div className="mt-6 text-gray-500 text-sm bg-gray-50 p-4 rounded-lg inline-block">
-                    Reason: {applicant.evaluation?.comment || 'Did not meet the criteria.'}
-                 </div>
-              </div>
-            )}
-
-            {/* Always show View Details in Final Step */}
-            <div className="mt-12 pt-8 border-t border-gray-100 w-full">
-                <button onClick={() => { setViewStepOverride(2); }} className="mx-auto flex items-center text-gray-500 hover:text-brand-600 text-sm font-medium">
-                    <FileText className="w-4 h-4 mr-2"/> View Application Details
-                </button>
-            </div>
+             )}
           </div>
         )}
 
+        {activeSubSection !== 'my_purchases' && currentStep === 4 && (
+          <div className="bg-white rounded-xl shadow-lg p-8 min-h-[500px] flex flex-col items-center w-full">{displayStatus === ApplicationStatus.PASSED && (<div className="max-w-4xl mx-auto w-full flex flex-col items-center"><div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6 animate-fade-in shadow-inner"><Trophy className="w-12 h-12" /></div><h2 className="text-4xl font-bold text-gray-900 mb-2 text-center">Congratulations!</h2><h3 className="text-2xl font-bold text-green-600 mb-6 text-center">You have been selected for admission</h3><div className="w-full bg-gray-50 rounded-2xl p-8 border border-gray-200 shadow-sm mb-8">{!formData.customData?.confirmedEnrollment ? (<div className="text-center animate-fade-in"><p className="text-lg text-gray-600 mb-8">Please confirm your enrollment within the specified period. Failure to do so will be considered a waiver of your rights.</p><div className="flex flex-col sm:flex-row gap-4 justify-center"><Button size="lg" onClick={handleConfirmEnrollment} className="bg-brand-600 hover:bg-brand-700 text-white px-10 py-6 text-xl shadow-lg shadow-brand-200"><Check className="w-6 h-6 mr-2"/> Confirm Enrollment</Button><Button size="lg" variant="outline" onClick={handleDeclineEnrollment} className="border-red-200 text-red-600 hover:bg-red-50 px-10 py-6 text-xl"><UserX className="w-6 h-6 mr-2"/> Decline Offer (Waiver)</Button></div></div>) : (<>{formData.feeStatuses?.tuition !== 'PAID' ? (<div className="animate-fade-in"><div className="flex items-center gap-3 mb-6 bg-green-50 p-4 rounded-xl border border-green-100"><div className="bg-green-100 p-2 rounded-full"><CheckCircle className="w-5 h-5 text-green-600"/></div><p className="font-bold text-green-800">You have successfully confirmed your enrollment.</p></div><p className="text-gray-600 mb-8 text-center">Next Step: Please pay the tuition fee to secure your spot.</p><div className="w-full text-left">{renderPaymentUI(handleTuitionPayment, 15000, 'Pay Tuition', 'Tuition Fee Payment')}</div></div>) : (<div className="text-center py-10 animate-fade-in"><div className="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-6 mx-auto"><Clock className="w-10 h-10 animate-pulse" /></div><h3 className="text-2xl font-bold text-gray-900 mb-4">Payment Completed</h3><p className="text-lg text-gray-600 max-w-lg mx-auto leading-relaxed">Your payment information has been received and is currently being verified. <br/><span className="font-bold text-brand-600">Please wait for the official announcement of the final enrollment list.</span></p></div>)}</>)}</div></div>)}{displayStatus === ApplicationStatus.ENROLLED && (<div className="text-center max-w-3xl mx-auto pt-10 animate-fade-in"><div className="w-28 h-28 bg-brand-100 text-brand-700 rounded-full flex items-center justify-center mb-6 mx-auto shadow-lg border-4 border-brand-200"><GraduationCap className="w-16 h-16" /></div><h2 className="text-4xl font-bold text-brand-600 mb-2">Welcome, New Student!</h2><h3 className="text-2xl font-bold text-gray-900 mb-6">You are officially eligible to enroll at UniAdmit University</h3><div className="bg-white p-8 rounded-2xl border-2 border-brand-200 shadow-xl inline-block text-left mb-8 max-w-md w-full relative overflow-hidden"><div className="absolute top-0 right-0 p-2"><Trophy className="w-12 h-12 text-brand-50 opacity-10" /></div><p className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-2">Temporary Student ID</p><p className="text-4xl font-mono font-bold text-brand-600 tracking-widest mb-6">66010559</p><div className="space-y-4 border-t border-gray-100 pt-6"><div className="flex justify-between items-center text-sm"><span className="text-gray-500">Full Name</span><span className="font-bold text-gray-900">{applicant.fullName}</span></div><div className="flex justify-between items-center text-sm"><span className="text-gray-500">Payment Status</span><span className="text-green-600 font-bold flex items-center"><Check className="w-4 h-4 mr-1"/> Paid Successfully</span></div><div className="flex justify-between items-center text-sm"><span className="text-gray-500">Student Status</span><span className="bg-brand-50 text-brand-700 px-2 py-1 rounded text-xs font-bold uppercase tracking-tighter">Official Student</span></div></div></div><p className="text-gray-600 mb-8 max-w-lg mx-auto">Please stay tuned for orientation details and first-semester course registration via your email.</p><Button variant="outline" className="border-brand-300 text-brand-700 hover:bg-brand-50"><FileDown className="w-4 h-4 mr-2"/> Download Certificate of Admission</Button></div>)}{displayStatus === ApplicationStatus.FAILED && (<div className="text-center pt-10 animate-fade-in"><div className="w-24 h-24 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-6 mx-auto shadow-inner"><AlertTriangle className="w-12 h-12" /></div><h2 className="text-3xl font-bold text-gray-900 mb-4">Admission Results</h2><div className="bg-red-50 border border-red-100 p-8 rounded-2xl max-w-lg mx-auto"><p className="text-lg text-red-700 font-bold mb-4">We regret to inform you</p><p className="text-gray-600">You have not been selected in this round, or you have waived your rights. <br/> Thank you for your interest in our university.</p>{applicant.evaluation?.comment && (<div className="mt-6 text-gray-500 text-sm bg-white p-3 rounded-lg border border-red-100 text-left"><span className="font-bold block mb-1">Remarks:</span>{applicant.evaluation.comment}</div>)}</div></div>)}<div className="mt-12 pt-8 border-t border-gray-100 w-full"><button onClick={() => { setViewStepOverride(2); }} className="mx-auto flex items-center text-gray-500 hover:text-brand-600 text-sm font-medium transition-colors"><FileText className="w-4 h-4 mr-2"/> View Previous Application Details</button></div></div>
+        )}
       </main>
 
-      {/* FOOTER PROTOTYPE CONTROL PANEL */}
       <div className="fixed bottom-0 left-0 right-0 bg-gray-900 text-white py-4 px-6 z-[100] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between">
-          <div className="flex items-center space-x-3 mb-4 md:mb-0">
-            <div className="bg-brand-600 p-1.5 rounded">
-              <Settings className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h3 className="font-bold text-sm uppercase tracking-wider">Prototype Control</h3>
-              <p className="text-xs text-gray-400">Current Step: <span className="text-brand-400">{steps.find(s => s.id === currentStep)?.name}</span></p>
-            </div>
-          </div>
-
+          <div className="flex items-center space-x-3 mb-4 md:mb-0"><div className="bg-brand-600 p-1.5 rounded"><Settings className="w-5 h-5 text-white" /></div><div><h3 className="font-bold text-sm uppercase tracking-wider">Prototype Control</h3><p className="text-xs text-gray-400">Current Step: <span className="text-brand-400">{steps.find(s => s.id === currentStep)?.name}</span></p></div></div>
           <div className="flex flex-wrap justify-center items-center gap-3">
-            
-            {/* Universal Reset */}
-            <Button size="sm" variant="danger" onClick={demoResetApplication} type="button" className="flex items-center">
-              <RefreshCw className="w-3 h-3 mr-2" /> Reset Application
-            </Button>
-
+            <Button size="sm" variant="danger" onClick={demoResetApplication} type="button" className="flex items-center"><RefreshCw className="w-3 h-3 mr-2" /> Reset Application</Button>
             <div className="h-6 w-px bg-gray-700 mx-2 hidden md:block"></div>
-
-            {/* Payment Toggle Controls */}
             <div className="flex items-center gap-2 mr-2">
-               <span className="text-xs text-gray-400 mr-1">Payment Config:</span>
-               <button 
-                 type="button"
-                 onClick={() => togglePaymentMethod('kplus')}
-                 className={`flex items-center px-2 py-1 rounded text-xs border transition-colors ${paymentConfig.kplus ? 'bg-green-900 border-green-600 text-green-400' : 'bg-gray-800 border-gray-600 text-gray-500'}`}
-               >
-                 {paymentConfig.kplus ? <ToggleRight className="w-3 h-3 mr-1" /> : <ToggleLeft className="w-3 h-3 mr-1" />}
-                 K-Plus
-               </button>
-               <button 
-                 type="button"
-                 onClick={() => togglePaymentMethod('qrcode')}
-                 className={`flex items-center px-2 py-1 rounded text-xs border transition-colors ${paymentConfig.qrcode ? 'bg-brand-900 border-brand-600 text-brand-400' : 'bg-gray-800 border-gray-600 text-gray-500'}`}
-               >
-                 {paymentConfig.qrcode ? <ToggleRight className="w-3 h-3 mr-1" /> : <ToggleLeft className="w-3 h-3 mr-1" />}
-                 QR Code
-               </button>
+                <span className="text-xs text-gray-400 mr-1">Payment Config:</span>
+                <button type="button" onClick={() => togglePaymentMethod('kplus')} className={`flex items-center px-2 py-1 rounded text-xs border transition-colors ${paymentConfig.kplus ? 'bg-green-900 border-green-600 text-green-400' : 'bg-gray-800 border-gray-600 text-gray-500'}`}>{paymentConfig.kplus ? <ToggleRight className="w-3 h-3 mr-1" /> : <ToggleLeft className="w-3 h-3 mr-1" />}K-Plus</button>
+                <button type="button" onClick={() => togglePaymentMethod('qrcode')} className={`flex items-center px-2 py-1 rounded text-xs border transition-colors ${paymentConfig.qrcode ? 'bg-brand-900 border-brand-600 text-brand-400' : 'bg-gray-800 border-gray-600 text-gray-500'}`}>{paymentConfig.qrcode ? <ToggleRight className="w-3 h-3 mr-1" /> : <ToggleLeft className="w-3 h-3 mr-1" />}QR Code</button>
             </div>
-            
             <div className="h-6 w-px bg-gray-700 mx-2 hidden md:block"></div>
-
-            {/* Step 1 Controls */}
-            {currentStep === 1 && activeSubSection !== 'my_purchases' && (
-              <Button size="sm" className="bg-brand-600 hover:bg-brand-700 text-white flex items-center" onClick={demoAutoFill} type="button">
-                <Wand2 className="w-3 h-3 mr-2" /> 
-                {activeSubSection === 'docs' ? 'Auto-Upload All' : activeSubSection === 'test' ? 'Auto-Answer All' : 'Auto-Fill Profile'}
-              </Button>
-            )}
-
-            {/* Step 2 Controls */}
-            {currentStep === 2 && (
-              <>
-                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white flex items-center" onClick={demoSimulateStaffApproval} type="button">
-                   <Check className="w-3 h-3 mr-2" /> Approve All
-                </Button>
-                <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white flex items-center" onClick={demoSimulateStaffReject} type="button">
-                   <X className="w-3 h-3 mr-2" /> Reject Docs
-                </Button>
-              </>
-            )}
-
-            {/* Step 3 Controls */}
-            {currentStep === 3 && (
-              <>
-                 {displayStatus === ApplicationStatus.DOCS_APPROVED && (
-                    <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={demoFailScreening} type="button">
-                       Fail Screening
-                    </Button>
-                 )}
-                 {displayStatus === ApplicationStatus.INTERVIEW_BOOKED && (
-                    <>
-                      <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={demoPassInterview} type="button">
-                         Pass Interview
-                      </Button>
-                      <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={demoFailInterview} type="button">
-                         Fail Interview
-                      </Button>
-                    </>
-                 )}
-              </>
-            )}
-
-            {/* Step 4 Controls */}
-            {currentStep === 4 && displayStatus === ApplicationStatus.PASSED && (
-                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={demoEnroll} type="button">
-                   Simulate Tuition Paid
-                </Button>
-            )}
-
+            {currentStep === 1 && activeSubSection !== 'my_purchases' && (<Button size="sm" className="bg-brand-600 hover:bg-brand-700 text-white flex items-center" onClick={demoAutoFill} type="button"><Wand2 className="w-3 h-3 mr-2" /> {activeSubSection === 'docs' ? 'Auto-Upload All' : activeSubSection === 'test' ? 'Auto-Answer All' : 'Auto-Fill Profile'}</Button>)}
+            {currentStep === 2 && (<><Button size="sm" className="bg-green-600 hover:bg-green-700 text-white flex items-center" onClick={() => {const updatedDocs = {...formData.documents}; Object.keys(updatedDocs).forEach(k => updatedDocs[k].status = DocumentStatus.APPROVED); const updated = {...formData, documents: updatedDocs, status: ApplicationStatus.DOCS_APPROVED, lastNotifiedStatus: ApplicationStatus.DOCS_APPROVED}; saveApplicant(updated); onUpdate(updated);}} type="button"><Check className="w-3 h-3 mr-1" /> Approve All</Button><Button size="sm" className="bg-red-600 hover:bg-red-700 text-white flex items-center" onClick={() => {const updatedDocs = {...formData.documents}; const k = Object.keys(updatedDocs)[0]; updatedDocs[k].status = DocumentStatus.REJECTED; updatedDocs[k].reviewNote = "Blurry image"; const updated = {...formData, documents: updatedDocs, status: ApplicationStatus.DOCS_REJECTED, lastNotifiedStatus: ApplicationStatus.DOCS_REJECTED}; saveApplicant(updated); onUpdate(updated);}} type="button"><X className="w-3 h-3 mr-1" /> Reject Docs</Button></>)}
+            {currentStep === 3 && (<>{displayStatus === ApplicationStatus.DOCS_APPROVED && (<Button size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={() => {const u = {...formData, status: ApplicationStatus.FAILED, lastNotifiedStatus: ApplicationStatus.FAILED, evaluation: {score:0, comment:'Screening failed'}}; saveApplicant(u); onUpdate(u);}} type="button">Fail Screening</Button>)}{displayStatus === ApplicationStatus.INTERVIEW_BOOKED && (<><Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => {const u = {...formData, status: ApplicationStatus.PASSED, lastNotifiedStatus: ApplicationStatus.PASSED, evaluation: {score:9, comment:'Great'}}; saveApplicant(u); onUpdate(u);}} type="button">Pass Interview</Button><Button size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={() => {const u = {...formData, status: ApplicationStatus.FAILED, lastNotifiedStatus: ApplicationStatus.FAILED, evaluation: {score:4, comment:'Needs work'}}; saveApplicant(u); onUpdate(u);}} type="button">Fail Interview</Button></>)}</>)}
+            {currentStep === 4 && (<>{displayStatus === ApplicationStatus.PASSED && (<Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => {const u = {...formData, status: ApplicationStatus.ENROLLED, lastNotifiedStatus: ApplicationStatus.ENROLLED}; saveApplicant(u); onUpdate(u);}} type="button">Simulate Final Enrollment List</Button>)}</>)}
           </div>
         </div>
       </div>
 
-      {/* PDPA Modal */}
-      {isPdpaModalOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl max-h-[80vh] overflow-y-auto animate-fade-in">
-                  <div className="flex items-center gap-3 mb-4 border-b border-gray-100 pb-3">
-                      <div className="bg-brand-100 p-2 rounded-full"><Shield className="w-6 h-6 text-brand-600"/></div>
-                      <h3 className="text-xl font-bold text-gray-900">PDPA Consent</h3>
-                  </div>
-                  <div className="text-sm text-gray-600 space-y-4 leading-relaxed">
-                      <p><strong>1. Collection of Personal Data:</strong> We collect your personal information (Name, ID, Contact, Education) solely for the purpose of the admission process and student registration.</p>
-                      <p><strong>2. Usage of Data:</strong> Your data will be used to evaluate your application, communicate results, and manage your student record if enrolled.</p>
-                      <p><strong>3. Disclosure:</strong> Your data may be shared with relevant university departments. We do not sell or share your data with third parties for marketing purposes without your explicit consent.</p>
-                      <p><strong>4. Data Retention:</strong> We retain your data for as long as necessary to fulfill the purposes outlined in this policy or as required by law.</p>
-                      <p><strong>5. Your Rights:</strong> You have the right to access, correct, or request deletion of your personal data, subject to applicable laws.</p>
-                  </div>
-                  <div className="mt-6 flex justify-end">
-                      <Button onClick={() => setIsPdpaModalOpen(false)}>Close & Agree</Button>
-                  </div>
-              </div>
-          </div>
-      )}
-
+      {isPdpaModalOpen && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl max-h-[80vh] overflow-y-auto animate-fade-in"><div className="flex items-center gap-3 mb-4 border-b border-gray-100 pb-3"><div className="bg-brand-100 p-2 rounded-full"><Shield className="w-6 h-6 text-brand-600"/></div><h3 className="text-xl font-bold text-gray-900">PDPA Consent</h3></div><div className="text-sm text-gray-600 space-y-4 leading-relaxed"><p><strong>1. Collection of Personal Data:</strong> We collect your personal information (Name, ID, Contact, Education) solely for the purpose of the admission process and student registration.</p><p><strong>2. Usage of Data:</strong> Your data will be used to evaluate your application, communicate results, and manage your student record if enrolled.</p><p><strong>3. Disclosure:</strong> Your data may be shared with relevant university departments. We do not sell or share your data with third parties for marketing purposes without your explicit consent.</p><p><strong>4. Data Retention:</strong> We retain your data for as long as necessary to fulfill the purposes outlined in this policy or as required by law.</p><p><strong>5. Your Rights:</strong> You have the right to access, correct, or request deletion of your personal data, subject to applicable laws.</p></div><div className="mt-6 flex justify-end"><Button onClick={() => setIsPdpaModalOpen(false)}>Close & Agree</Button></div></div></div>)}
     </div>
   );
 };
