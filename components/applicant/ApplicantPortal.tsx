@@ -8,7 +8,8 @@ import {
   CheckCircle, AlertCircle, Clock, Upload, FileText, Calendar, 
   Check, X, User, FileCheck, CreditCard, PenTool, Settings, RefreshCw, Wand2, Trash2, ChevronLeft, ArrowRight,
   Smartphone, QrCode, Image as ImageIcon, ToggleLeft, ToggleRight, GraduationCap, AlertTriangle, Mail, MapPin, Phone, Plus,
-  Globe, Bell, LogOut, HelpCircle, Award, MessageSquare, DollarSign, ZoomIn, ZoomOut, Move, FileDown, Shield, Trophy, UserX
+  Globe, Bell, LogOut, HelpCircle, Award, MessageSquare, DollarSign, ZoomIn, ZoomOut, Move, FileDown, Shield, Trophy, UserX,
+  Languages, FilePlus
 } from 'lucide-react';
 
 interface Props {
@@ -53,6 +54,19 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
   const [isSlotConfirmed, setIsSlotConfirmed] = useState(false);
   const [interviewDeclarationChecked, setInterviewDeclarationChecked] = useState(false);
   const [hasAcknowledgedScreening, setHasAcknowledgedScreening] = useState(false);
+
+  // Additional Interview Info State
+  const [additionalInfoSubmitted, setAdditionalInfoSubmitted] = useState(false);
+  const [interviewInfo, setInterviewInfo] = useState({
+    currentAddress: '',
+    psychLang: '',
+    proficiency: {
+      listening: '',
+      speaking: '',
+      writing: '',
+      reading: ''
+    }
+  });
 
   // Announcements
   const [systemAnnouncements, setSystemAnnouncements] = useState<Announcement[]>([]);
@@ -568,7 +582,8 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
               lastNotifiedStatus: ApplicationStatus.INTERVIEW_BOOKED,
               customData: { 
                   ...formData.customData, 
-                  writtenSlotId: tempWrittenSlotId 
+                  writtenSlotId: tempWrittenSlotId,
+                  interviewInfo: interviewInfo // Save the new information
               },
               feeStatuses: { 
                  application: formData.feeStatuses?.application || 'PENDING' as FeeStatus,
@@ -581,6 +596,7 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
           setTempInterviewSlotId(null);
           setTempWrittenSlotId(null);
           setIsSlotConfirmed(false);
+          setAdditionalInfoSubmitted(false);
           alert("Payment Successful! Your slots are booked.");
       } else {
           alert("One of the slots is no longer available.");
@@ -1107,11 +1123,125 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
                </div>
              )}
 
-             {/* Phase 3: Slot Confirmed -> Proceed to Payment */}
-             {displayStatus === ApplicationStatus.DOCS_APPROVED && hasAcknowledgedScreening && isSlotConfirmed && tempInterviewSlotId && tempWrittenSlotId && (
-                <div className="max-w-3xl mx-auto w-full animate-fade-in">
+             {/* Phase 3: Additional Information Form (Between Slots and Payment) */}
+             {displayStatus === ApplicationStatus.DOCS_APPROVED && hasAcknowledgedScreening && isSlotConfirmed && !additionalInfoSubmitted && (
+                <div className="max-w-4xl mx-auto w-full animate-fade-in py-6">
                     <button onClick={() => setIsSlotConfirmed(false)} className="mb-6 flex items-center text-gray-500 font-medium hover:text-brand-600 transition-colors">
                         <ChevronLeft className="w-4 h-4 mr-1"/> Back to Selection
+                    </button>
+
+                    <div className="mb-8 border-b border-gray-100 pb-4">
+                        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                           <FilePlus className="text-brand-600 w-6 h-6"/> Interview Information
+                        </h2>
+                        <p className="text-gray-500 mt-1">Please provide the remaining details to finalize your interview profile.</p>
+                    </div>
+
+                    <div className="space-y-10">
+                        {/* 1. Address */}
+                        <div>
+                            <label className="block text-lg font-bold text-gray-800 mb-3">1. Please fill out your current address on the interview day</label>
+                            <textarea 
+                                className="w-full border border-gray-300 rounded-xl p-4 min-h-[120px] focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-white text-gray-900 shadow-sm"
+                                placeholder="Example: 123/45 Moo 1, Sukhumvit Road, Khlong Toei, Bangkok, 10110, Thailand"
+                                value={interviewInfo.currentAddress}
+                                onChange={(e) => setInterviewInfo({...interviewInfo, currentAddress: e.target.value})}
+                            />
+                        </div>
+
+                        {/* 2. Assessment Language */}
+                        <div>
+                            <label className="block text-lg font-bold text-gray-800 mb-3">2. Please choose the language for the psychological assessment according to your preference</label>
+                            <div className="flex flex-wrap gap-4">
+                                {['Thai', 'English'].map(lang => (
+                                    <label key={lang} className={`flex-1 min-w-[150px] flex items-center p-4 border rounded-md cursor-pointer transition-all duration-200 ${interviewInfo.psychLang === lang ? 'border-brand-600 ring-1 ring-brand-600 bg-brand-50' : 'border-gray-300 bg-white hover:bg-gray-50'}`}>
+                                        <input 
+                                            type="radio" 
+                                            name="psychLang" 
+                                            className="hidden" 
+                                            checked={interviewInfo.psychLang === lang}
+                                            onChange={() => setInterviewInfo({...interviewInfo, psychLang: lang})}
+                                        />
+                                        <div className={`flex-shrink-0 w-5 h-5 rounded-full border flex items-center justify-center mr-3 transition-colors ${interviewInfo.psychLang === lang ? 'border-brand-600' : 'border-gray-300 bg-white'}`}>
+                                            {interviewInfo.psychLang === lang && <div className="w-2.5 h-2.5 rounded-full bg-brand-600" />}
+                                        </div>
+                                        <span className="text-sm font-bold text-gray-900">{lang}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 3. Thai Proficiency Grid */}
+                        <div>
+                            <label className="block text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                <Languages className="w-5 h-5 text-brand-600"/> 3. Please describe your current Thai proficiency
+                            </label>
+                            <div className="overflow-x-auto bg-white rounded-2xl border border-gray-200 shadow-sm">
+                                <table className="w-full min-w-[600px] border-collapse">
+                                    <thead>
+                                        <tr className="bg-gray-50 text-gray-500 text-xs font-bold uppercase tracking-wider">
+                                            <th className="p-4 text-left border-b w-1/4">Skill</th>
+                                            {['None', 'Beginner', 'Intermediate', 'Advanced', 'Native Thai'].map(lvl => (
+                                                <th key={lvl} className="p-4 text-center border-b">{lvl}</th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {[
+                                            { key: 'listening', label: '3.1 Listening' },
+                                            { key: 'speaking', label: '3.2 Speaking' },
+                                            { key: 'writing', label: '3.3 Writing' },
+                                            { key: 'reading', label: '3.4 Reading' }
+                                        ].map(skill => (
+                                            <tr key={skill.key} className="hover:bg-gray-50 transition-colors">
+                                                <td className="p-4 font-bold text-gray-700">{skill.label}</td>
+                                                {['None', 'Beginner', 'Intermediate', 'Advanced', 'Native Thai'].map(lvl => (
+                                                    <td key={lvl} className="p-4 text-center">
+                                                        <div className="flex justify-center">
+                                                            <label className="cursor-pointer p-2 rounded-full hover:bg-brand-50 transition-colors">
+                                                                <input 
+                                                                    type="radio" 
+                                                                    name={skill.key} 
+                                                                    className="hidden"
+                                                                    checked={interviewInfo.proficiency[skill.key as keyof typeof interviewInfo.proficiency] === lvl}
+                                                                    onChange={() => setInterviewInfo({
+                                                                        ...interviewInfo, 
+                                                                        proficiency: { ...interviewInfo.proficiency, [skill.key]: lvl }
+                                                                    })}
+                                                                />
+                                                                <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${interviewInfo.proficiency[skill.key as keyof typeof interviewInfo.proficiency] === lvl ? 'border-brand-600 bg-brand-50' : 'border-gray-300 bg-white'}`}>
+                                                                    {interviewInfo.proficiency[skill.key as keyof typeof interviewInfo.proficiency] === lvl && <div className="w-2.5 h-2.5 rounded-full bg-brand-600" />}
+                                                                </div>
+                                                            </label>
+                                                        </div>
+                                                    </td>
+                                                ))}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-12 pt-8 border-t border-gray-100 flex justify-center">
+                        <Button 
+                            size="lg" 
+                            className="px-16 py-4 shadow-lg shadow-brand-200 font-bold"
+                            disabled={!interviewInfo.currentAddress || !interviewInfo.psychLang || !interviewInfo.proficiency.listening || !interviewInfo.proficiency.speaking || !interviewInfo.proficiency.writing || !interviewInfo.proficiency.reading}
+                            onClick={() => setAdditionalInfoSubmitted(true)}
+                        >
+                            Complete & Proceed to Payment
+                        </Button>
+                    </div>
+                </div>
+             )}
+
+             {/* Phase 4: Slot Summary & Payment */}
+             {displayStatus === ApplicationStatus.DOCS_APPROVED && hasAcknowledgedScreening && isSlotConfirmed && additionalInfoSubmitted && tempInterviewSlotId && tempWrittenSlotId && (
+                <div className="max-w-3xl mx-auto w-full animate-fade-in">
+                    <button onClick={() => setAdditionalInfoSubmitted(false)} className="mb-6 flex items-center text-gray-500 font-medium hover:text-brand-600 transition-colors">
+                        <ChevronLeft className="w-4 h-4 mr-1"/> Back to Additional Info
                     </button>
                     
                     <div className="bg-brand-50 border border-brand-200 p-6 rounded-2xl mb-8">
@@ -1237,7 +1367,7 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
             </div>
             <div className="h-6 w-px bg-gray-700 mx-2 hidden md:block"></div>
             {currentStep === 1 && activeSubSection !== 'my_purchases' && (<Button size="sm" className="bg-brand-600 hover:bg-brand-700 text-white flex items-center" onClick={demoAutoFill} type="button"><Wand2 className="w-3 h-3 mr-2" /> {activeSubSection === 'docs' ? 'Auto-Upload All' : activeSubSection === 'test' ? 'Auto-Answer All' : 'Auto-Fill Profile'}</Button>)}
-            {currentStep === 2 && (<><Button size="sm" className="bg-green-600 hover:bg-green-700 text-white flex items-center" onClick={() => {const updatedDocs = {...formData.documents}; Object.keys(updatedDocs).forEach(k => updatedDocs[k].status = DocumentStatus.APPROVED); const updated = {...formData, documents: updatedDocs, status: ApplicationStatus.DOCS_APPROVED, lastNotifiedStatus: ApplicationStatus.DOCS_APPROVED}; saveApplicant(updated); onUpdate(updated);}} type="button"><Check className="w-3 h-3 mr-1" /> Approve All</Button><Button size="sm" className="bg-red-600 hover:bg-red-700 text-white flex items-center" onClick={() => {const updatedDocs = {...formData.documents}; const k = Object.keys(updatedDocs)[0]; updatedDocs[k].status = DocumentStatus.REJECTED; updatedDocs[k].reviewNote = "Blurry image"; const updated = {...formData, documents: updatedDocs, status: ApplicationStatus.DOCS_REJECTED, lastNotifiedStatus: ApplicationStatus.DOCS_REJECTED}; saveApplicant(updated); onUpdate(updated);}} type="button"><X className="w-3 h-3 mr-1" /> Reject Docs</Button></>)}
+            {currentStep === 2 && (<><Button size="sm" className="bg-green-600 hover:bg-green-700 text-white flex items-center" onClick={() => {const updatedDocs = {...formData.documents}; Object.keys(updatedDocs).forEach(k => updatedDocs[k].status = DocumentStatus.APPROVED); const updated = {...formData, documents: updatedDocs, status: ApplicationStatus.DOCS_APPROVED, lastNotifiedStatus: ApplicationStatus.DOCS_APPROVED}; saveApplicant(updated); onUpdate(updated);}} type="button"><Check className="w-3 h-3 mr-2" /> Approve All</Button><Button size="sm" className="bg-red-600 hover:bg-red-700 text-white flex items-center" onClick={() => {const updatedDocs = {...formData.documents}; const k = Object.keys(updatedDocs)[0]; updatedDocs[k].status = DocumentStatus.REJECTED; updatedDocs[k].reviewNote = "Blurry image"; const updated = {...formData, documents: updatedDocs, status: ApplicationStatus.DOCS_REJECTED, lastNotifiedStatus: ApplicationStatus.DOCS_REJECTED}; saveApplicant(updated); onUpdate(updated);}} type="button"><X className="w-3 h-3 mr-2" /> Reject Docs</Button></>)}
             {currentStep === 3 && (<>{displayStatus === ApplicationStatus.DOCS_APPROVED && (<Button size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={() => {const u = {...formData, status: ApplicationStatus.FAILED, lastNotifiedStatus: ApplicationStatus.FAILED, evaluation: {score:0, comment:'Screening failed'}}; saveApplicant(u); onUpdate(u);}} type="button">Fail Screening</Button>)}{displayStatus === ApplicationStatus.INTERVIEW_BOOKED && (<><Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => {const u = {...formData, status: ApplicationStatus.PASSED, lastNotifiedStatus: ApplicationStatus.PASSED, evaluation: {score:9, comment:'Great'}}; saveApplicant(u); onUpdate(u);}} type="button">Pass Interview</Button><Button size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={() => {const u = {...formData, status: ApplicationStatus.FAILED, lastNotifiedStatus: ApplicationStatus.FAILED, evaluation: {score:4, comment:'Needs work'}}; saveApplicant(u); onUpdate(u);}} type="button">Fail Interview</Button></>)}</>)}
             {currentStep === 4 && (<>{displayStatus === ApplicationStatus.PASSED && (<Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => {const u = {...formData, status: ApplicationStatus.ENROLLED, lastNotifiedStatus: ApplicationStatus.ENROLLED}; saveApplicant(u); onUpdate(u);}} type="button">Simulate Final Enrollment List</Button>)}</>)}
           </div>
