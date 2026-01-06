@@ -55,6 +55,9 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
   const [interviewDeclarationChecked, setInterviewDeclarationChecked] = useState(false);
   const [hasAcknowledgedScreening, setHasAcknowledgedScreening] = useState(false);
 
+  // Result Confirmation state
+  const [isDeclineModalOpen, setIsDeclineModalOpen] = useState(false);
+
   // Additional Interview Info State
   const [additionalInfoSubmitted, setAdditionalInfoSubmitted] = useState(false);
   const [interviewInfo, setInterviewInfo] = useState({
@@ -557,7 +560,7 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
     setTimeout(() => {
       setIsPayLoading(false);
       let score = 0; exams.forEach(q => { score += 5; });
-      const updated = { ...formData, status: ApplicationStatus.SUBMITTED, lastNotifiedStatus: ApplicationStatus.SUBMITTED, examScore: score, isESigned: true, signatureImage: signatureImage, eSignTimestamp: new Date().toISOString(), feeStatuses: { application: 'PAID' as FeeStatus, interview: formData.feeStatuses?.interview || 'PENDING' as FeeStatus, tuition: formData.feeStatuses?.tuition || 'PENDING' as FeeStatus } };
+      const updated = { ...formData, status: ApplicationStatus.SUBMITTED, lastNotifiedStatus: ApplicationStatus.SUBMITTED, examScore: score, iESigned: true, signatureImage: signatureImage, eSignTimestamp: new Date().toISOString(), feeStatuses: { application: 'PAID' as FeeStatus, interview: formData.feeStatuses?.interview || 'PENDING' as FeeStatus, tuition: formData.feeStatuses?.tuition || 'PENDING' as FeeStatus } };
       saveApplicant(updated); onUpdate(updated);
       if (isEditRestricted) { alert("Application Resubmitted Successfully."); setForceEditMode(false); setViewStepOverride(null); } else { alert("Payment Successful! Application Submitted."); }
       setSlipFile(null); setSlipPreview(null);
@@ -625,9 +628,14 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
   };
 
   const handleDeclineEnrollment = () => {
-      if (!confirm("Are you sure you want to decline? This action is permanent.")) return;
-      const updated = { ...formData, status: ApplicationStatus.FAILED, lastNotifiedStatus: ApplicationStatus.FAILED, evaluation: { score: 0, comment: 'Applicant declined enrollment offer.' } };
+      const updated = { 
+        ...formData, 
+        status: ApplicationStatus.FAILED, 
+        lastNotifiedStatus: ApplicationStatus.FAILED, 
+        evaluation: { score: 0, comment: 'Applicant waived their admission rights.' } 
+      };
       saveApplicant(updated); onUpdate(updated);
+      setIsDeclineModalOpen(false);
   };
 
   const handleDownloadReceipt = (feeType: string) => {
@@ -1349,8 +1357,145 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
           </div>
         )}
 
+        {/* STEP 4: Result */}
         {activeSubSection !== 'my_purchases' && currentStep === 4 && (
-          <div className="bg-white rounded-xl shadow-lg p-8 min-h-[500px] flex flex-col items-center w-full">{displayStatus === ApplicationStatus.PASSED && (<div className="max-w-4xl mx-auto w-full flex flex-col items-center"><div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6 animate-fade-in shadow-inner"><Trophy className="w-12 h-12" /></div><h2 className="text-4xl font-bold text-gray-900 mb-2 text-center">Congratulations!</h2><h3 className="text-2xl font-bold text-green-600 mb-6 text-center">You have been selected for admission</h3><div className="w-full bg-gray-50 rounded-2xl p-8 border border-gray-200 shadow-sm mb-8">{!formData.customData?.confirmedEnrollment ? (<div className="text-center animate-fade-in"><p className="text-lg text-gray-600 mb-8">Please confirm your enrollment within the specified period. Failure to do so will be considered a waiver of your rights.</p><div className="flex flex-col sm:flex-row gap-4 justify-center"><Button size="lg" onClick={handleConfirmEnrollment} className="bg-brand-600 hover:bg-brand-700 text-white px-10 py-6 text-xl shadow-lg shadow-brand-200"><Check className="w-6 h-6 mr-2"/> Confirm Enrollment</Button><Button size="lg" variant="outline" onClick={handleDeclineEnrollment} className="border-red-200 text-red-600 hover:bg-red-50 px-10 py-6 text-xl"><UserX className="w-6 h-6 mr-2"/> Decline Offer (Waiver)</Button></div></div>) : (<>{formData.feeStatuses?.tuition !== 'PAID' ? (<div className="animate-fade-in"><div className="flex items-center gap-3 mb-6 bg-green-50 p-4 rounded-xl border border-green-100"><div className="bg-green-100 p-2 rounded-full"><CheckCircle className="w-5 h-5 text-green-600"/></div><p className="font-bold text-green-800">You have successfully confirmed your enrollment.</p></div><p className="text-gray-600 mb-8 text-center">Next Step: Please pay the tuition fee to secure your spot.</p><div className="w-full text-left">{renderPaymentUI(handleTuitionPayment, 15000, 'Pay Tuition', 'Tuition Fee Payment')}</div></div>) : (<div className="text-center py-10 animate-fade-in"><div className="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-6 mx-auto"><Clock className="w-10 h-10 animate-pulse" /></div><h3 className="text-2xl font-bold text-gray-900 mb-4">Payment Completed</h3><p className="text-lg text-gray-600 max-w-lg mx-auto leading-relaxed">Your payment information has been received and is currently being verified. <br/><span className="font-bold text-brand-600">Please wait for the official announcement of the final enrollment list.</span></p></div>)}</>)}</div></div>)}{displayStatus === ApplicationStatus.ENROLLED && (<div className="text-center max-w-3xl mx-auto pt-10 animate-fade-in"><div className="w-28 h-28 bg-brand-100 text-brand-700 rounded-full flex items-center justify-center mb-6 mx-auto shadow-lg border-4 border-brand-200"><GraduationCap className="w-16 h-16" /></div><h2 className="text-4xl font-bold text-brand-600 mb-2">Welcome, New Student!</h2><h3 className="text-2xl font-bold text-gray-900 mb-6">You are officially eligible to enroll at UniAdmit University</h3><div className="bg-white p-8 rounded-2xl border-2 border-brand-200 shadow-xl inline-block text-left mb-8 max-w-md w-full relative overflow-hidden"><div className="absolute top-0 right-0 p-2"><Trophy className="w-12 h-12 text-brand-50 opacity-10" /></div><p className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-2">Temporary Student ID</p><p className="text-4xl font-mono font-bold text-brand-600 tracking-widest mb-6">66010559</p><div className="space-y-4 border-t border-gray-100 pt-6"><div className="flex justify-between items-center text-sm"><span className="text-gray-500">Full Name</span><span className="font-bold text-gray-900">{applicant.fullName}</span></div><div className="flex justify-between items-center text-sm"><span className="text-gray-500">Payment Status</span><span className="text-green-600 font-bold flex items-center"><Check className="w-4 h-4 mr-1"/> Paid Successfully</span></div><div className="flex justify-between items-center text-sm"><span className="text-gray-500">Student Status</span><span className="bg-brand-50 text-brand-700 px-2 py-1 rounded text-xs font-bold uppercase tracking-tighter">Official Student</span></div></div></div><p className="text-gray-600 mb-8 max-w-lg mx-auto">Please stay tuned for orientation details and first-semester course registration via your email.</p><Button variant="outline" className="border-brand-300 text-brand-700 hover:bg-brand-50"><FileDown className="w-4 h-4 mr-2"/> Download Certificate of Admission</Button></div>)}{displayStatus === ApplicationStatus.FAILED && (<div className="text-center pt-10 animate-fade-in"><div className="w-24 h-24 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-6 mx-auto shadow-inner"><AlertTriangle className="w-12 h-12" /></div><h2 className="text-3xl font-bold text-gray-900 mb-4">Admission Results</h2><div className="bg-red-50 border border-red-100 p-8 rounded-2xl max-w-lg mx-auto"><p className="text-lg text-red-700 font-bold mb-4">We regret to inform you</p><p className="text-gray-600">You have not been selected in this round, or you have waived your rights. <br/> Thank you for your interest in our university.</p>{applicant.evaluation?.comment && (<div className="mt-6 text-gray-500 text-sm bg-white p-3 rounded-lg border border-red-100 text-left"><span className="font-bold block mb-1">Remarks:</span>{applicant.evaluation.comment}</div>)}</div></div>)}<div className="mt-12 pt-8 border-t border-gray-100 w-full"><button onClick={() => { setViewStepOverride(2); }} className="mx-auto flex items-center text-gray-500 hover:text-brand-600 text-sm font-medium transition-colors"><FileText className="w-4 h-4 mr-2"/> View Previous Application Details</button></div></div>
+          <div className="bg-white rounded-xl shadow-lg p-8 min-h-[500px] flex flex-col items-center w-full">
+            {displayStatus === ApplicationStatus.PASSED && (
+              <div className="max-w-4xl mx-auto w-full flex flex-col items-center">
+                <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6 animate-fade-in shadow-inner">
+                  <Trophy className="w-12 h-12" />
+                </div>
+                <h2 className="text-4xl font-bold text-gray-900 mb-2 text-center">Congratulations!</h2>
+                <h3 className="text-2xl font-bold text-green-600 mb-6 text-center">You have been selected for admission</h3>
+                
+                <div className="w-full bg-gray-50 rounded-2xl p-8 border border-gray-200 shadow-sm mb-8">
+                  {!formData.customData?.confirmedEnrollment ? (
+                    <div className="text-center animate-fade-in">
+                      <p className="text-lg text-gray-600 mb-8">Please confirm your enrollment within the specified period. Failure to do so will be considered a waiver of your rights.</p>
+                      <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                        <Button size="lg" onClick={handleConfirmEnrollment} className="bg-brand-600 hover:bg-brand-700 text-white px-10 py-6 text-xl shadow-lg shadow-brand-200">
+                          <Check className="w-6 h-6 mr-2"/> Confirm Enrollment
+                        </Button>
+                        <Button size="lg" variant="outline" onClick={() => setIsDeclineModalOpen(true)} className="border-red-200 text-red-600 hover:bg-red-50 px-10 py-6 text-xl">
+                          <UserX className="w-6 h-6 mr-2"/> Decline Offer (Waiver)
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {formData.feeStatuses?.tuition !== 'PAID' ? (
+                        <div className="animate-fade-in">
+                          <div className="flex items-center gap-3 mb-6 bg-green-50 p-4 rounded-xl border border-green-100">
+                            <div className="bg-green-100 p-2 rounded-full"><CheckCircle className="w-5 h-5 text-green-600"/></div>
+                            <p className="font-bold text-green-800">Your enrollment confirmation will be final once the tuition payment is successfully processed.</p>
+                          </div>
+                          <p className="text-gray-600 mb-8 text-center">Next Step: Please pay the tuition fee to secure your spot.</p>
+                          <div className="w-full text-left">{renderPaymentUI(handleTuitionPayment, 15000, 'Pay Tuition', 'Tuition Fee Payment')}</div>
+                        </div>
+                      ) : (
+                        <div className="animate-fade-in w-full max-w-lg mx-auto">
+                            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3 border-b border-gray-100 pb-2">Payment Status</h3>
+                            <div className="flex items-center p-4 bg-green-50 rounded-lg border border-green-100">
+                                <div className="bg-green-100 p-2 rounded-full mr-4"><CheckCircle className="w-6 h-6 text-green-600" /></div>
+                                <div>
+                                    <div className="text-sm font-bold text-gray-900">Tuition Fee (15,000 THB)</div>
+                                    <div className="text-xs text-green-700 font-medium flex items-center mt-1">Payment Completed & Being Verified</div>
+                                </div>
+                            </div>
+                            <p className="text-sm text-gray-500 mt-8 text-center leading-relaxed">
+                                Your payment information has been received and is currently being verified. <br/>
+                                <span className="font-bold text-brand-600 block mt-1 italic">Please wait for the official announcement of the final enrollment list.</span>
+                            </p>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {displayStatus === ApplicationStatus.ENROLLED && (
+              <div className="text-center max-w-3xl mx-auto pt-10 animate-fade-in">
+                <div className="w-28 h-28 bg-brand-100 text-brand-700 rounded-full flex items-center justify-center mb-6 mx-auto shadow-lg border-4 border-brand-200">
+                  <GraduationCap className="w-16 h-16" />
+                </div>
+                <h2 className="text-4xl font-bold text-brand-600 mb-2">Welcome, New Student!</h2>
+                <h3 className="text-2xl font-bold text-gray-900 mb-6">You are officially eligible to enroll at UniAdmit University</h3>
+                
+                <div className="bg-white p-8 rounded-2xl border-2 border-brand-200 shadow-xl inline-block text-left mb-8 max-w-md w-full relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-2"><Trophy className="w-12 h-12 text-brand-50 opacity-10" /></div>
+                  <p className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-2">Temporary Student ID</p>
+                  <p className="text-4xl font-mono font-bold text-brand-600 tracking-widest mb-6">66010559</p>
+                  <div className="space-y-4 border-t border-gray-100 pt-6">
+                    <div className="flex justify-between items-center text-sm"><span className="text-gray-500">Full Name</span><span className="font-bold text-gray-900">{applicant.fullName}</span></div>
+                    <div className="flex justify-between items-center text-sm"><span className="text-gray-500">Payment Status</span><span className="text-green-600 font-bold flex items-center"><Check className="w-4 h-4 mr-1"/> Paid Successfully</span></div>
+                    <div className="flex justify-between items-center text-sm"><span className="text-gray-500">Student Status</span><span className="bg-brand-50 text-brand-700 px-2 py-1 rounded text-xs font-bold uppercase tracking-tighter">Official Student</span></div>
+                  </div>
+                </div>
+                <p className="text-gray-600 mb-8 max-w-lg mx-auto">Please stay tuned for orientation details and first-semester course registration via your email.</p>
+                <Button variant="outline" className="border-brand-300 text-brand-700 hover:bg-brand-50"><FileDown className="w-4 h-4 mr-2"/> Download Certificate of Admission</Button>
+              </div>
+            )}
+
+            {displayStatus === ApplicationStatus.FAILED && (
+              <div className="text-center pt-10 animate-fade-in w-full">
+                <div className="w-24 h-24 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-6 mx-auto shadow-inner">
+                  <AlertTriangle className="w-12 h-12" />
+                </div>
+                <h2 className="text-3xl font-bold text-gray-900 mb-4">Admission Results</h2>
+                <div className="bg-red-50 border border-red-100 p-8 rounded-2xl max-w-lg mx-auto shadow-sm">
+                  <p className="text-xl text-red-700 font-bold mb-4">We regret to inform you</p>
+                  <p className="text-gray-600 leading-relaxed">
+                    Your application for the current academic year was not successful. <br/> 
+                    This may be due to a competitive evaluation process or a waiver of admission rights.
+                  </p>
+                  <div className="mt-8 border-t border-red-200 pt-6">
+                    <p className="text-sm text-gray-500 mb-4">Thank you for your interest and for choosing UniAdmit. We wish you the best in your future academic endeavors.</p>
+                    {applicant.evaluation?.comment && (
+                      <div className="mt-2 text-left bg-white p-4 rounded-xl border border-red-100">
+                        <span className="text-xs font-bold text-red-400 uppercase tracking-widest block mb-2">Remarks / Notes</span>
+                        <p className="text-sm text-gray-700 font-medium italic">"{applicant.evaluation.comment}"</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="mt-10">
+                   <Button variant="outline" onClick={() => { setViewStepOverride(2); }} className="text-sm"><FileText className="w-4 h-4 mr-2"/> Review Application Details</Button>
+                </div>
+              </div>
+            )}
+
+            {/* Confirmation Modal for declining offer */}
+            {isDeclineModalOpen && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[110] p-4">
+                <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl animate-fade-in text-center">
+                  <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-6 mx-auto">
+                    <AlertTriangle className="w-10 h-10" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-3">Decline Admission Offer?</h3>
+                  <p className="text-gray-600 mb-8 leading-relaxed">
+                    Are you sure you want to waive your admission rights? This action is <span className="font-bold text-red-600 uppercase">permanent</span> and cannot be undone. 
+                    You will lose your spot for this academic year.
+                  </p>
+                  <div className="flex flex-col gap-3">
+                    <Button variant="danger" size="lg" className="w-full font-bold shadow-lg shadow-red-200" onClick={handleDeclineEnrollment}>
+                      Yes, Decline Offer
+                    </Button>
+                    <Button variant="secondary" size="lg" className="w-full border-gray-200" onClick={() => setIsDeclineModalOpen(false)}>
+                      Cancel (Keep Offer)
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div className="mt-12 pt-8 border-t border-gray-100 w-full">
+              <button onClick={() => { setViewStepOverride(2); }} className="mx-auto flex items-center text-gray-500 hover:text-brand-600 text-sm font-medium transition-colors">
+                <FileText className="w-4 h-4 mr-2"/> View Previous Application Details
+              </button>
+            </div>
+          </div>
         )}
       </main>
 
