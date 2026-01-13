@@ -91,13 +91,13 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
     switch (status) {
         case ApplicationStatus.DRAFT: return 1;
         case ApplicationStatus.SUBMITTED: 
-        case ApplicationStatus.DOCS_REJECTED: return 2;
+        case ApplicationStatus.DOCS_REJECTED: 
         case ApplicationStatus.DOCS_APPROVED:
+        case ApplicationStatus.FAILED: return 2; // TERMINAL FAILURE stays in Step 2 context as requested
         case ApplicationStatus.INTERVIEW_READY:
         case ApplicationStatus.INTERVIEW_BOOKED: return 3;
         case ApplicationStatus.PASSED:
-        case ApplicationStatus.ENROLLED:
-        case ApplicationStatus.FAILED: return 4;
+        case ApplicationStatus.ENROLLED: return 4;
         default: return 1;
     }
   };
@@ -312,7 +312,7 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
               if (!currentDocs[docId]) {
                   currentDocs[docId] = { id: docId, name: docName, status: DocumentStatus.PENDING, isDynamic: true, configId: 'doc_conf_edu' };
               } else if (currentDocs[docId].name !== docName) {
-                  currentDocs[docId].name = docName;
+                  currentDocs[currentDocs[docId].id].name = docName;
               }
           });
       }
@@ -537,7 +537,7 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
                     <h4 className="font-bold text-gray-900">Attach Payment Slip</h4>
                     <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition-colors">
                         {slipPreview ? (
-                            <div className="relative"><img src={slipPreview} alt="Slip Preview" className="max-h-40 mx-auto rounded shadow-sm" /><button onClick={() => {setSlipFile(null); setSlipPreview(null);}} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"><X className="w-4 h-4" /></button></div>
+                            <div className="relative"><img src={slipPreview} alt="Slip Preview" className="max-h-40 mx-auto rounded shadow-sm" /><button onClick={() => {setSlipFile(null); setSlipPreview(null);}} className="absolute -top-2 -right-2 bg-red-50 text-white rounded-full p-1 hover:bg-red-600"><X className="w-4 h-4" /></button></div>
                         ) : (
                             <label className="cursor-pointer flex flex-col items-center justify-center h-full"><ImageIcon className="w-10 h-10 text-gray-400 mb-2" /><span className="text-sm text-brand-600 font-medium">Upload Payment Slip</span><span className="text-xs text-gray-400 mt-1">JPG, PNG only</span><input type="file" accept="image/*" className="hidden" onChange={handleSlipUpload} /></label>
                         )}
@@ -674,7 +674,7 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
     }
     let nextStatus = ApplicationStatus.DRAFT;
     if (stepId === 2) nextStatus = ApplicationStatus.SUBMITTED;
-    if (stepId === 3) nextStatus = ApplicationStatus.DOCS_APPROVED;
+    if (stepId === 3) nextStatus = ApplicationStatus.INTERVIEW_READY;
     if (stepId === 4) nextStatus = ApplicationStatus.PASSED;
     const updated = { ...formData, status: nextStatus, lastNotifiedStatus: nextStatus };
     setFormData(updated); saveApplicant(updated); onUpdate(updated);
@@ -936,8 +936,155 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
           </div>
         )}
 
+        {/* STEP 2: Verification */}
         {activeSubSection !== 'my_purchases' && currentStep === 2 && (
-          <div className="grid grid-cols-1 gap-8 min-h-[500px]"><div className="bg-white rounded-xl shadow-lg p-8 border border-gray-200">{displayStatus === ApplicationStatus.DOCS_REJECTED ? (<div className="text-center mb-8 animate-fade-in"><div className="w-24 h-24 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-6 mx-auto"><X className="w-12 h-12" /></div><h2 className="text-3xl font-bold text-red-700 mb-2">Documents Returned</h2><p className="text-lg text-gray-600 mb-6">One or more documents have been rejected by our staff. Please correct them to proceed.</p><Button size="lg" onClick={handleFixApplication} className="bg-red-600 hover:bg-red-700 text-white">Fix Application</Button></div>) : (<><div className="text-center mb-12 animate-fade-in py-8"><div className="w-24 h-24 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center mb-6 mx-auto"><Clock className="w-12 h-12" /></div><h2 className="text-3xl font-bold text-gray-900 mb-4">Verification In Progress</h2><p className="text-xl text-gray-600 max-w-2xl mx-auto">Your application is under review by our staff. Please check back later.</p></div></>)}<div className="space-y-8"><div className="bg-white border border-gray-200 rounded-lg overflow-hidden"><div className="flex justify-between items-center p-4 bg-gray-50 border-b border-gray-200"><h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center"><User className="w-4 h-4 mr-2"/> Applicant Information</h3>{(() => { const hasFieldRejections = Object.keys(formData.fieldRejections || {}).length > 0; if (displayStatus === ApplicationStatus.DOCS_REJECTED && hasFieldRejections) { return <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full font-bold flex items-center"><AlertTriangle className="w-3 h-3 mr-1"/> Action Required</span>; } else if ([ApplicationStatus.DOCS_APPROVED, ApplicationStatus.INTERVIEW_READY, ApplicationStatus.INTERVIEW_BOOKED, ApplicationStatus.PASSED, ApplicationStatus.ENROLLED].includes(displayStatus)) { return <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-bold flex items-center"><Check className="w-3 h-3 mr-1"/> Verified</span>; } else { return <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-bold">Pending Review</span>; } })()}</div><div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm p-6">{fieldConfigs.filter(f => !f.isHidden).map(f => renderReadOnlyField(f))}</div></div><div><h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3 border-b border-gray-100 pb-2">Documents & Evidence</h3><div className="space-y-3">{(Object.values(formData.documents) as DocumentItem[]).sort((a,b) => { const confA = docConfigs.find(c => c.id === a.configId); const confB = docConfigs.find(c => c.id === b.configId); return (confA?.order || 99) - (confB?.order || 99); }).map((doc: DocumentItem) => { let badge = <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-bold">Pending Review</span>; if (displayStatus === ApplicationStatus.DOCS_REJECTED) { if (doc.status === DocumentStatus.REJECTED) { badge = <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full font-bold flex items-center"><AlertTriangle className="w-3 h-3 mr-1"/> Action Required</span>; } else if (doc.status === DocumentStatus.APPROVED || doc.status === DocumentStatus.UPLOADED) { badge = <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-bold flex items-center"><Check className="w-3 h-3 mr-1"/> Passed</span>; } } else if (displayStatus === ApplicationStatus.SUBMITTED) { if (doc.status === DocumentStatus.APPROVED) { badge = <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-bold">Verified</span>; } else if (doc.status === DocumentStatus.UPLOADED) { badge = <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-bold">Uploaded</span>; } } return (<div key={doc.id} className={`flex items-center justify-between p-3 rounded border ${doc.status === DocumentStatus.REJECTED ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}><div className="flex items-center"><FileText className={`w-5 h-5 mr-3 ${doc.status === DocumentStatus.REJECTED ? 'text-red-500' : 'text-gray-400'}`}/><div><span className="text-sm font-medium text-gray-900 block">{doc.name}</span>{doc.reviewNote && <span className="text-xs text-red-600 font-bold block mt-0.5">{doc.reviewNote}</span>}</div></div>{badge}</div>); })}</div></div><div><h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3 border-b border-gray-100 pb-2">Payment Status</h3><div className="flex items-center p-4 bg-green-50 rounded-lg border border-green-100"><div className="bg-green-100 p-2 rounded-full mr-4"><CheckCircle className="w-6 h-6 text-green-600" /></div><div><div className="text-sm font-bold text-gray-900">Application Fee (500 THB)</div><div className="text-xs text-green-700 font-medium flex items-center mt-1">Payment Verified</div></div></div></div></div></div></div>
+          <div className="grid grid-cols-1 gap-8 min-h-[500px]">
+            <div className="bg-white rounded-xl shadow-lg p-8 border border-gray-200">
+              {displayStatus === ApplicationStatus.DOCS_REJECTED ? (
+                /* 1. DOCUMENTS RETURNED (ORANGE) */
+                <div className="text-center mb-12 animate-fade-in py-8">
+                  <div className="w-24 h-24 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-6 mx-auto">
+                    <RefreshCw className="w-12 h-12" />
+                  </div>
+                  <h2 className="text-3xl font-bold text-amber-700 mb-4">Documents Returned</h2>
+                  <p className="text-xl text-gray-600 max-w-2xl mx-auto mb-8">One or more documents have been rejected by our staff. Please correct them to proceed.</p>
+                  <Button size="lg" onClick={handleFixApplication} className="bg-amber-600 hover:bg-amber-700 text-white px-8">Fix Application</Button>
+                </div>
+              ) : displayStatus === ApplicationStatus.DOCS_APPROVED ? (
+                /* 2. VERIFICATION SUCCESSFUL (GREEN) */
+                <div className="text-center mb-12 animate-fade-in py-8">
+                  <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6 mx-auto">
+                    <CheckCircle className="w-12 h-12" />
+                  </div>
+                  <h2 className="text-3xl font-bold text-gray-900 mb-4">Verification Successful</h2>
+                  <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+                    All your documents and information have been verified. <br/>
+                    <span className="font-bold text-brand-600">Please wait for the official interview shortlist announcement.</span>
+                  </p>
+                </div>
+              ) : displayStatus === ApplicationStatus.FAILED ? (
+                /* 3. ADMISSION UNSUCCESSFUL (RED) */
+                <div className="text-center mb-12 animate-fade-in py-8">
+                  <div className="w-24 h-24 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-6 mx-auto">
+                    <AlertTriangle className="w-12 h-12" />
+                  </div>
+                  <h2 className="text-3xl font-bold text-gray-900 mb-4">Admission Unsuccessful</h2>
+                  <div className="bg-red-50 border border-red-100 p-6 rounded-2xl max-w-xl mx-auto shadow-sm">
+                    <p className="text-lg text-red-700 font-bold mb-2">
+                      {(() => {
+                        // Logic for Thai failure messages
+                        const hasRejectedDocs = Object.values(formData.documents).some((d: DocumentItem) => d.status === DocumentStatus.REJECTED);
+                        if (hasRejectedDocs) {
+                          return "คุณไม่ได้แก้ไขเอกสารกลับมาในเวลาที่กำหนด";
+                        } else if (applicant.customData?.canAppeal) {
+                          return "คุณสมบัติขั้นต่ำของคุณไม่ผ่านเกณฑ์";
+                        } else {
+                          return "ไม่ผ่านการคัดเลือกในรอบใบสมัคร";
+                        }
+                      })()}
+                    </p>
+                    <p className="text-gray-600 leading-relaxed">
+                        Your application for the current academic year was not successful.
+                    </p>
+                  </div>
+                  {applicant.customData?.canAppeal && !Object.values(formData.documents).some((d: DocumentItem) => d.status === DocumentStatus.REJECTED) && (
+                      <div className="mt-6 flex justify-center animate-fade-in">
+                          <Button 
+                              variant="outline" 
+                              className="border-brand-600 text-brand-600 hover:bg-brand-50 font-bold shadow-sm flex items-center gap-2 px-8"
+                              onClick={() => alert("Your appeal request has been submitted.")}
+                          >
+                              <RefreshCw className="w-4 h-4" /> Appeal Result
+                          </Button>
+                      </div>
+                  )}
+                </div>
+              ) : (
+                /* 4. VERIFICATION IN PROGRESS (BLUE) */
+                <div className="text-center mb-12 animate-fade-in py-8">
+                  <div className="w-24 h-24 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-6 mx-auto">
+                    <Clock className="w-12 h-12" />
+                  </div>
+                  <h2 className="text-3xl font-bold text-gray-900 mb-4">Verification In Progress</h2>
+                  <p className="text-xl text-gray-600 max-w-2xl mx-auto">Your application is under review by our staff. Please check back later.</p>
+                </div>
+              )}
+
+              <div className="space-y-8">
+                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="flex justify-between items-center p-4 bg-gray-50 border-b border-gray-200">
+                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center"><User className="w-4 h-4 mr-2"/> Applicant Information</h3>
+                    {(() => { 
+                      const hasFieldRejections = Object.keys(formData.fieldRejections || {}).length > 0;
+                      if (displayStatus === ApplicationStatus.DOCS_REJECTED && hasFieldRejections) { 
+                        return <span className="px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded-full font-bold flex items-center"><AlertTriangle className="w-3 h-3 mr-1"/> Action Required</span>; 
+                      } else if (displayStatus === ApplicationStatus.DOCS_APPROVED) { 
+                        return <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-bold flex items-center"><Check className="w-3 h-3 mr-1"/> Verified</span>; 
+                      } else if (displayStatus === ApplicationStatus.FAILED) {
+                        return <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full font-bold">Failed</span>;
+                      } else { 
+                        return <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-bold">Pending Review</span>; 
+                      } 
+                    })()}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm p-6">{fieldConfigs.filter(f => !f.isHidden).map(f => renderReadOnlyField(f))}</div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3 border-b border-gray-100 pb-2">Documents & Evidence</h3>
+                  <div className="space-y-3">
+                    {(Object.values(formData.documents) as DocumentItem[]).sort((a,b) => { 
+                      const confA = docConfigs.find(c => c.id === a.configId); 
+                      const confB = docConfigs.find(c => c.id === b.configId); 
+                      return (confA?.order || 99) - (confB?.order || 99); 
+                    }).map((doc: DocumentItem) => { 
+                      let badge = <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-bold">Pending Review</span>; 
+                      if (displayStatus === ApplicationStatus.DOCS_REJECTED) { 
+                        if (doc.status === DocumentStatus.REJECTED) { 
+                          badge = <span className="px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded-full font-bold flex items-center"><AlertTriangle className="w-3 h-3 mr-1"/> Action Required</span>; 
+                        } else if (doc.status === DocumentStatus.APPROVED || doc.status === DocumentStatus.UPLOADED) { 
+                          badge = <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-bold flex items-center"><Check className="w-3 h-3 mr-1"/> Passed</span>; 
+                        } 
+                      } else if (displayStatus === ApplicationStatus.SUBMITTED) { 
+                        if (doc.status === DocumentStatus.APPROVED) { 
+                          badge = <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-bold">Verified</span>; 
+                        } else if (doc.status === DocumentStatus.UPLOADED) { 
+                          badge = <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-bold">Uploaded</span>; 
+                        } 
+                      } else if (displayStatus === ApplicationStatus.DOCS_APPROVED) {
+                        badge = <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-bold">Verified</span>;
+                      } else if (displayStatus === ApplicationStatus.FAILED) {
+                        badge = <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full font-bold">Failed</span>;
+                      }
+                      return (
+                        <div key={doc.id} className={`flex items-center justify-between p-3 rounded border ${doc.status === DocumentStatus.REJECTED ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200'}`}>
+                          <div className="flex items-center">
+                            <FileText className={`w-5 h-5 mr-3 ${doc.status === DocumentStatus.REJECTED ? 'text-amber-500' : 'text-gray-400'}`}/>
+                            <div>
+                              <span className="text-sm font-medium text-gray-900 block">{doc.name}</span>
+                              {doc.reviewNote && <span className="text-xs text-amber-600 font-bold block mt-0.5">{doc.reviewNote}</span>}
+                            </div>
+                          </div>
+                          {badge}
+                        </div>
+                      ); 
+                    }).filter(Boolean)}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3 border-b border-gray-100 pb-2">Payment Status</h3>
+                  <div className="flex items-center p-4 bg-green-50 rounded-lg border border-green-100">
+                    <div className="bg-green-100 p-2 rounded-full mr-4"><CheckCircle className="w-6 h-6 text-green-600" /></div>
+                    <div>
+                      <div className="text-sm font-bold text-gray-900">Application Fee (500 THB)</div>
+                      <div className="text-xs text-green-700 font-medium flex items-center mt-1">Payment Verified</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* STEP 3: Interview (Redesigned Flow) */}
@@ -945,7 +1092,7 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
           <div className="bg-white rounded-xl shadow-lg p-8 min-h-[500px] flex flex-col">
              
              {/* Phase 1: Screening Result & Declaration */}
-             {displayStatus === ApplicationStatus.DOCS_APPROVED && !hasAcknowledgedScreening && (
+             {(displayStatus === ApplicationStatus.DOCS_APPROVED || displayStatus === ApplicationStatus.INTERVIEW_READY) && !hasAcknowledgedScreening && (
                 <div className="max-w-3xl mx-auto w-full animate-fade-in py-8">
                     <div className="text-center mb-10">
                         <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6 mx-auto shadow-inner">
@@ -1005,7 +1152,7 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
              )}
 
              {/* Phase 2: Dual Slot Selection (Only if Declared) */}
-             {displayStatus === ApplicationStatus.DOCS_APPROVED && hasAcknowledgedScreening && !isSlotConfirmed && (
+             {(displayStatus === ApplicationStatus.DOCS_APPROVED || displayStatus === ApplicationStatus.INTERVIEW_READY) && hasAcknowledgedScreening && !isSlotConfirmed && (
                <div className="animate-fade-in">
                   <button onClick={() => setHasAcknowledgedScreening(false)} className="mb-6 flex items-center text-gray-500 font-medium hover:text-brand-600 transition-colors">
                       <ChevronLeft className="w-4 h-4 mr-1"/> Back to Result
@@ -1132,7 +1279,7 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
              )}
 
              {/* Phase 3: Additional Information Form (Between Slots and Payment) */}
-             {displayStatus === ApplicationStatus.DOCS_APPROVED && hasAcknowledgedScreening && isSlotConfirmed && !additionalInfoSubmitted && (
+             {(displayStatus === ApplicationStatus.DOCS_APPROVED || displayStatus === ApplicationStatus.INTERVIEW_READY) && hasAcknowledgedScreening && isSlotConfirmed && !additionalInfoSubmitted && (
                 <div className="max-w-4xl mx-auto w-full animate-fade-in py-6">
                     <button onClick={() => setIsSlotConfirmed(false)} className="mb-6 flex items-center text-gray-500 font-medium hover:text-brand-600 transition-colors">
                         <ChevronLeft className="w-4 h-4 mr-1"/> Back to Selection
@@ -1246,7 +1393,7 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
              )}
 
              {/* Phase 4: Slot Summary & Payment */}
-             {displayStatus === ApplicationStatus.DOCS_APPROVED && hasAcknowledgedScreening && isSlotConfirmed && additionalInfoSubmitted && tempInterviewSlotId && tempWrittenSlotId && (
+             {(displayStatus === ApplicationStatus.DOCS_APPROVED || displayStatus === ApplicationStatus.INTERVIEW_READY) && hasAcknowledgedScreening && isSlotConfirmed && additionalInfoSubmitted && tempInterviewSlotId && tempWrittenSlotId && (
                 <div className="max-w-3xl mx-auto w-full animate-fade-in">
                     <button onClick={() => setAdditionalInfoSubmitted(false)} className="mb-6 flex items-center text-gray-500 font-medium hover:text-brand-600 transition-colors">
                         <ChevronLeft className="w-4 h-4 mr-1"/> Back to Additional Info
@@ -1437,35 +1584,6 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
               </div>
             )}
 
-            {displayStatus === ApplicationStatus.FAILED && (
-              <div className="text-center pt-10 animate-fade-in w-full">
-                <div className="w-24 h-24 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-6 mx-auto shadow-inner">
-                  <AlertTriangle className="w-12 h-12" />
-                </div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">Admission Results</h2>
-                <div className="bg-red-50 border border-red-100 p-8 rounded-2xl max-w-lg mx-auto shadow-sm">
-                  <p className="text-xl text-red-700 font-bold mb-4">We regret to inform you</p>
-                  <p className="text-gray-600 leading-relaxed">
-                    Your application for the current academic year was not successful. <br/> 
-                    This may be due to a competitive evaluation process or a waiver of admission rights.
-                  </p>
-                  <div className="mt-8 border-t border-red-200 pt-6">
-                    <p className="text-sm text-gray-500 mb-4">Thank you for your interest and for choosing UniAdmit. We wish you the best in your future academic endeavors.</p>
-                    {applicant.evaluation?.comment && (
-                      <div className="mt-2 text-left bg-white p-4 rounded-xl border border-red-100">
-                        <span className="text-xs font-bold text-red-400 uppercase tracking-widest block mb-2">Remarks / Notes</span>
-                        <p className="text-sm text-gray-700 font-medium italic">"{applicant.evaluation.comment}"</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="mt-10">
-                   <Button variant="outline" onClick={() => { setViewStepOverride(2); }} className="text-sm"><FileText className="w-4 h-4 mr-2"/> Review Application Details</Button>
-                </div>
-              </div>
-            )}
-
             {/* Confirmation Modal for declining offer */}
             {isDeclineModalOpen && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[110] p-4">
@@ -1512,7 +1630,95 @@ export const ApplicantPortal: React.FC<Props> = ({ applicant, onUpdate, onLogout
             </div>
             <div className="h-6 w-px bg-gray-700 mx-2 hidden md:block"></div>
             {currentStep === 1 && activeSubSection !== 'my_purchases' && (<Button size="sm" className="bg-brand-600 hover:bg-brand-700 text-white flex items-center" onClick={demoAutoFill} type="button"><Wand2 className="w-3 h-3 mr-2" /> {activeSubSection === 'docs' ? 'Auto-Upload All' : activeSubSection === 'test' ? 'Auto-Answer All' : 'Auto-Fill Profile'}</Button>)}
-            {currentStep === 2 && (<><Button size="sm" className="bg-green-600 hover:bg-green-700 text-white flex items-center" onClick={() => {const updatedDocs = {...formData.documents}; Object.keys(updatedDocs).forEach(k => updatedDocs[k].status = DocumentStatus.APPROVED); const updated = {...formData, documents: updatedDocs, status: ApplicationStatus.DOCS_APPROVED, lastNotifiedStatus: ApplicationStatus.DOCS_APPROVED}; saveApplicant(updated); onUpdate(updated);}} type="button"><Check className="w-3 h-3 mr-2" /> Approve All</Button><Button size="sm" className="bg-red-600 hover:bg-red-700 text-white flex items-center" onClick={() => {const updatedDocs = {...formData.documents}; const k = Object.keys(updatedDocs)[0]; updatedDocs[k].status = DocumentStatus.REJECTED; updatedDocs[k].reviewNote = "Blurry image"; const updated = {...formData, documents: updatedDocs, status: ApplicationStatus.DOCS_REJECTED, lastNotifiedStatus: ApplicationStatus.DOCS_REJECTED}; saveApplicant(updated); onUpdate(updated);}} type="button"><X className="w-3 h-3 mr-2" /> Reject Docs</Button></>)}
+            {currentStep === 2 && (
+              <>
+                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white flex items-center" onClick={() => {
+                  const updatedDocs = {...formData.documents}; 
+                  Object.keys(updatedDocs).forEach(k => updatedDocs[k].status = DocumentStatus.APPROVED); 
+                  const updated = {...formData, documents: updatedDocs, status: ApplicationStatus.DOCS_APPROVED, lastNotifiedStatus: ApplicationStatus.DOCS_APPROVED}; 
+                  saveApplicant(updated); 
+                  onUpdate(updated);
+                }} type="button">
+                  <Check className="w-3 h-3 mr-2" /> Approve All (Success)
+                </Button>
+                
+                <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white flex items-center" onClick={() => {
+                  const updated = {
+                    ...formData, 
+                    status: ApplicationStatus.FAILED, 
+                    lastNotifiedStatus: ApplicationStatus.FAILED,
+                    evaluation: { score: 0, comment: "Qualifications mismatch" },
+                    customData: { ...formData.customData, canAppeal: true }
+                  }; 
+                  // Clear rejected status to simulate normal qualification failure
+                  const cleanDocs = { ...updated.documents };
+                  Object.keys(cleanDocs).forEach(k => { if(cleanDocs[k].status === DocumentStatus.REJECTED) cleanDocs[k].status = DocumentStatus.UPLOADED; });
+                  updated.documents = cleanDocs;
+                  saveApplicant(updated); 
+                  onUpdate(updated);
+                }} type="button">
+                  <RefreshCw className="w-3 h-3 mr-2" /> Fail + Allow Appeal
+                </Button>
+
+                <Button size="sm" className="bg-red-800 hover:bg-red-900 text-white flex items-center" onClick={() => {
+                  const updated = {
+                    ...formData, 
+                    status: ApplicationStatus.FAILED, 
+                    lastNotifiedStatus: ApplicationStatus.FAILED,
+                    evaluation: { score: 0, comment: "Final rejection" },
+                    customData: { ...formData.customData, canAppeal: false }
+                  }; 
+                  // Clear rejected status to simulate normal selection failure
+                  const cleanDocs = { ...updated.documents };
+                  Object.keys(cleanDocs).forEach(k => { if(cleanDocs[k].status === DocumentStatus.REJECTED) cleanDocs[k].status = DocumentStatus.UPLOADED; });
+                  updated.documents = cleanDocs;
+                  saveApplicant(updated); 
+                  onUpdate(updated);
+                }} type="button">
+                  <UserX className="w-3 h-3 mr-2" /> Fail + No Appeal
+                </Button>
+
+                <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white flex items-center" onClick={() => {
+                  const updatedDocs = {...formData.documents}; 
+                  const k = Object.keys(updatedDocs).find(key => updatedDocs[key].configId !== 'doc_conf_pic') || Object.keys(updatedDocs)[0]; 
+                  updatedDocs[k].status = DocumentStatus.REJECTED; 
+                  updatedDocs[k].reviewNote = "Please re-upload a clearer copy."; 
+                  const updated = {
+                    ...formData, 
+                    documents: updatedDocs, 
+                    status: ApplicationStatus.FAILED, 
+                    lastNotifiedStatus: ApplicationStatus.FAILED,
+                    customData: { ...formData.customData, canAppeal: false }
+                  }; 
+                  saveApplicant(updated); 
+                  onUpdate(updated);
+                }} type="button">
+                  <AlertCircle className="w-3 h-3 mr-2" /> Fail (Missed Deadline)
+                </Button>
+
+                {displayStatus === ApplicationStatus.DOCS_APPROVED && (
+                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white flex items-center" onClick={() => {
+                    const updated = {...formData, status: ApplicationStatus.INTERVIEW_READY, lastNotifiedStatus: ApplicationStatus.INTERVIEW_READY}; 
+                    saveApplicant(updated); 
+                    onUpdate(updated);
+                  }} type="button">
+                    <ArrowRight className="w-3 h-3 mr-2" /> Pass to Interview
+                  </Button>
+                )}
+                
+                <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white flex items-center" onClick={() => {
+                  const updatedDocs = {...formData.documents}; 
+                  const k = Object.keys(updatedDocs)[0]; 
+                  updatedDocs[k].status = DocumentStatus.REJECTED; 
+                  updatedDocs[k].reviewNote = "Blurry image"; 
+                  const updated = {...formData, documents: updatedDocs, status: ApplicationStatus.DOCS_REJECTED, lastNotifiedStatus: ApplicationStatus.DOCS_REJECTED}; 
+                  saveApplicant(updated); 
+                  onUpdate(updated);
+                }} type="button">
+                  <X className="w-3 h-3 mr-2" /> Reject Docs (Orange)
+                </Button>
+              </>
+            )}
             {currentStep === 3 && (<>{displayStatus === ApplicationStatus.DOCS_APPROVED && (<Button size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={() => {const u = {...formData, status: ApplicationStatus.FAILED, lastNotifiedStatus: ApplicationStatus.FAILED, evaluation: {score:0, comment:'Screening failed'}}; saveApplicant(u); onUpdate(u);}} type="button">Fail Screening</Button>)}{displayStatus === ApplicationStatus.INTERVIEW_BOOKED && (<><Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => {const u = {...formData, status: ApplicationStatus.PASSED, lastNotifiedStatus: ApplicationStatus.PASSED, evaluation: {score:9, comment:'Great'}}; saveApplicant(u); onUpdate(u);}} type="button">Pass Interview</Button><Button size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={() => {const u = {...formData, status: ApplicationStatus.FAILED, lastNotifiedStatus: ApplicationStatus.FAILED, evaluation: {score:4, comment:'Needs work'}}; saveApplicant(u); onUpdate(u);}} type="button">Fail Interview</Button></>)}</>)}
             {currentStep === 4 && (<>{displayStatus === ApplicationStatus.PASSED && (<Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => {const u = {...formData, status: ApplicationStatus.ENROLLED, lastNotifiedStatus: ApplicationStatus.ENROLLED}; saveApplicant(u); onUpdate(u);}} type="button">Simulate Final Enrollment List</Button>)}</>)}
           </div>
